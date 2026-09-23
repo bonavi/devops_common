@@ -1,13 +1,14 @@
 services:
   node-exporter:
-    image: prom/node-exporter:latest
+    image: "prom/node-exporter:latest"
+    container_name: node-exporter
     restart: on-failure
     network_mode: host
+    hostname: "{{ ansible_hostname }}"
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /:/rootfs:ro
-    hostname: "{{ ansible_hostname }}"
     command:
       - '--path.procfs=/host/proc'
       - '--path.rootfs=/rootfs'

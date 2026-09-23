@@ -1,0 +1,26 @@
+---
+# Эмулирует работу certbot: раскладывает вручную подготовленные файлы
+# сертификата в /etc/letsencrypt/archive/<domain>/ и делает на них симлинки
+# из /etc/letsencrypt/live/<domain>/ — так же, как это делает сам certbot,
+# поэтому nginx (и всё остальное, что ждёт стандартный layout
+# letsencrypt) не отличает такой сертификат от настоящего.
+
+- name: Ensure archive directory exists
+  file:
+    path: "/etc/letsencrypt/archive/{{ item }}"
+    state: directory
+    mode: '0755'
+  loop: "{{ certs_manual_domains }}"
+
+- name: Ensure live directory exists
+  file:
+    path: "/etc/letsencrypt/live/{{ item }}"
+    state: directory
+    mode: '0755'
+  loop: "{{ certs_manual_domains }}"
+
+- name: Seed archive + link live per domain
+  include_tasks: seed-domain.yml
+  loop: "{{ certs_manual_domains }}"
+  loop_control:
+    loop_var: certs_manual_domain

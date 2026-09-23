@@ -1,0 +1,15 @@
+---
+- name: "Copy manual cert files into archive ({{ certs_manual_domain }})"
+  copy:
+    src: "{{ certs_manual_source_dir }}/{{ certs_manual_domain }}/{{ item }}"
+    dest: "/etc/letsencrypt/archive/{{ certs_manual_domain }}/{{ item | regex_replace('\\.pem$', '1.pem') }}"
+    mode: '0644'
+  loop: "{{ certs_manual_files }}"
+
+- name: "Create live symlinks, certbot-style ({{ certs_manual_domain }})"
+  file:
+    src: "../../archive/{{ certs_manual_domain }}/{{ item | regex_replace('\\.pem$', '1.pem') }}"
+    dest: "/etc/letsencrypt/live/{{ certs_manual_domain }}/{{ item }}"
+    state: link
+    force: yes
+  loop: "{{ certs_manual_files }}"

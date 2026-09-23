@@ -1,0 +1,19 @@
+---
+# Список доменов, для которых нужно "подложить" сертификат вручную
+# (эмуляция certbot — без реального выпуска/DNS-01).
+certs_manual_domains: []
+
+certs_manual_files:
+  - cert.pem
+  - chain.pem
+  - fullchain.pem
+  - privkey.pem
+
+# Где на Ansible-контроллере лежат файлы сертификатов — по поддиректории
+# на домен: {{ certs_manual_source_dir }}/<domain>/{cert,chain,fullchain,privkey}.pem
+# По умолчанию — host_vars текущего хоста (тот же принцип, что и для
+# env.yml/secrets.yml: всё специфичное для хоста в одном месте, а не
+# привязано к тому, какой плейбук роль вызвал). Сами файлы — секреты
+# конкретного проекта, поэтому в common не хранятся: директория гитигнорится
+# в проекте и наполняется руками.
+certs_manual_source_dir: "{{ inventory_dir }}/host_vars/{{ inventory_hostname }}/certs-manual"

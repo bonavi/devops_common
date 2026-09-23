@@ -1,0 +1,46 @@
+---
+# Общая механика деплоя docker-compose приложения: отрендерить compose,
+# пере-поднять контейнер. Подключать ТОЛЬКО через import_tasks (не
+# include_role!) — так template ищет docker-compose.yml.j2 в templates/
+# вызывающей роли, а не в этой common-роли, которая своих templates не имеет.
+#
+# Использование в роли конкретного приложения (ansible/roles/<app>/tasks/main.yml):
+#   - import_tasks: ../../../common/ansible/roles/docker-compose-app/tasks/deploy.yml
+#     vars:
+#       docker_compose_app_name: xray-agent
+#
+# Роль-приложение должна предоставить templates/docker-compose.yml.j2.
+# Если приложению нужны доп. директории или seed-файлы (см. 3x-ui) —
+# заводите под них обычные таски прямо в самой роли-приложении, перед этим
+# import_tasks: это знание принадлежит роли, а не общей механике деплоя.
+
+- name: Ensure project directory exists
+  file:
+    path: "{{ project_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Set compose file path
+  set_fact:
+    docker_compose_app_file: >-
+      {{ project_dir }}/docker-compose-{{ docker_compose_app_name }}{{ '-' + docker_compose_app_env_suffix if docker_compose_app_env_suffix | default('') else '' }}.yml
+
+- name: Copy docker-compose file to the server
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ docker_compose_app_file }}"
+
+- name: Pull new version of {{ docker_compose_app_name }} image
+  command: docker compose -f {{ docker_compose_app_file }} pull
+  args:
+    chdir: "{{ project_dir }}"
+
+- name: Down {{ docker_compose_app_name }}
+  command: docker compose -f {{ docker_compose_app_file }} down
+  args:
+    chdir: "{{ project_dir }}"
+
+- name: Run {{ docker_compose_app_name }}
+  command: docker compose -f {{ docker_compose_app_file }} up -d
+  args:
+    chdir: "{{ project_dir }}"
