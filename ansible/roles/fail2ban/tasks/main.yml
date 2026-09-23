@@ -1,0 +1,30 @@
+- name: Install fail2ban
+  ansible.builtin.apt:
+    name: fail2ban
+    state: present
+    update_cache: yes
+
+- name: Configure fail2ban jail
+  ansible.builtin.copy:
+    dest: /etc/fail2ban/jail.local
+    content: |
+      [DEFAULT]
+      bantime  = {{ fail2ban_bantime }}
+      findtime = {{ fail2ban_findtime }}
+      maxretry = {{ fail2ban_maxretry }}
+      backend  = systemd
+      ignoreip = {{ fail2ban_ignoreip | join(' ') }}
+
+      [sshd]
+      enabled = true
+      port    = {{ ssh_port }}
+    owner: root
+    group: root
+    mode: '0644'
+  register: fail2ban_config
+
+- name: Ensure fail2ban is enabled and running
+  ansible.builtin.systemd:
+    name: fail2ban
+    enabled: yes
+    state: "{{ 'restarted' if fail2ban_config.changed else 'started' }}"

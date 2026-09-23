@@ -1,0 +1,2 @@
+# SSH port used by the sshd hardening drop-in
+ssh_port: 2002

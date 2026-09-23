@@ -1,0 +1,14 @@
+- name: Load nf_conntrack module
+  community.general.modprobe:
+    name: nf_conntrack
+    state: present
+    persistent: present
+
+- name: Set conntrack limit
+  ansible.posix.sysctl:
+    name: net.netfilter.nf_conntrack_max
+    value: "{{ conntrack_max }}"
+    sysctl_file: /etc/sysctl.d/99-conntrack.conf
+    sysctl_set: yes
+    state: present
+    reload: yes

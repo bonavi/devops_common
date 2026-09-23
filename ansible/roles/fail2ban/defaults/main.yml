@@ -1,0 +1,12 @@
+# SSH port for the fail2ban sshd jail (must match ssh_hardening's ssh_port)
+ssh_port: 2002
+
+# fail2ban tuning
+fail2ban_bantime: 1h
+fail2ban_findtime: 10m
+fail2ban_maxretry: 5
+# IPs/subnets that are never banned. Add your WireGuard subnet here
+# so the automation can never lock you out of your own tunnel.
+fail2ban_ignoreip:
+  - 127.0.0.1/8
+  - ::1
