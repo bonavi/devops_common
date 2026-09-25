@@ -16,8 +16,14 @@ serviceAccount:
 
 replicaCount: 1
 
+hostNetwork: false
+dnsPolicy: ""
+
 deployment:
   enabled: true
+  # Автоматический rollout пода при изменении configmap/secret/extraConfigMaps/extraSecrets
+  # (через checksum-аннотации). Выключить, если редеплой на изменение конфигов не нужен.
+  redeployOnConfigChange: true
   revisionHistoryLimit: 5
   terminationGracePeriodSeconds: 30
   strategy:
@@ -98,13 +104,30 @@ extraEnv: []
 extraEnvFrom: []
 
 extraConfigMaps: {}
+
+extraSecrets: {}
+  # kubeconfig:
+  #   stringData:
+  #     config: |
+  #       apiVersion: v1
+  #       ...
   # envoy-config:
   #   data:
   #     envoy.yaml: |
   #       # supports {{`{{ .Values.foo }}`}} via tpl
 
+# PVC создаются по имени <fullname>-<ключ>; сослаться на них нужно вручную
+# в volumes через persistentVolumeClaim.claimName.
+persistence: {}
+  # data:
+  #   enabled: true
+  #   size: 5Gi
+  #   storageClassName: local-path
+  #   accessModes: [ReadWriteOnce]
+
 volumes: []
 volumeMounts: []
+initContainers: []
 lifecycle: {}
 
 nodeSelector: {}

@@ -18,8 +18,16 @@ spec:
   template:
     metadata:
       annotations:
+        {{- if .Values.deployment.redeployOnConfigChange }}
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        # Без этих двух правка extraConfigMaps/extraSecrets обновляет объект, но
+        # не перекатывает под. Для файлов, смонтированных через subPath, это
+        # особенно коварно: subPath вообще не обновляется в живом поде, и старый
+        # конфиг продолжает работать до случайного рестарта.
+        checksum/extra-configmaps: {{ include (print $.Template.BasePath "/extra-configmaps.yaml") . | sha256sum }}
+        checksum/extra-secrets: {{ include (print $.Template.BasePath "/extra-secrets.yaml") . | sha256sum }}
+        {{- end }}
         {{- with .Values.deployment.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -29,6 +37,10 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
+      {{- if .Values.hostNetwork }}
+      hostNetwork: true
+      dnsPolicy: {{ .Values.dnsPolicy | default "ClusterFirstWithHostNet" }}
+      {{- end }}
       serviceAccountName: {{ include "app.serviceAccountName" . }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -39,6 +51,10 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       terminationGracePeriodSeconds: {{ .Values.deployment.terminationGracePeriodSeconds }}
+      {{- with .Values.initContainers }}
+      initContainers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ include "app.name" . }}
           image: {{ include "app.image" . }}
