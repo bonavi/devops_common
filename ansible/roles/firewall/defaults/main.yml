@@ -1,0 +1,28 @@
+# Пользовательская цепочка, куда собираются все allow-правила периметра.
+# INPUT просто передаёт весь трафик на разбор в неё без собственных условий —
+# сама фильтрация происходит внутри цепочки.
+firewall_chain: FRONTDOOR
+
+# Список разрешённых входящих портов.
+# interface — опционально: ограничивает правило конкретным интерфейсом
+# (например wg0), иначе порт открыт с любого интерфейса.
+#
+# firewall_allowed_ports:
+#   - { port: 80, protocol: tcp }
+#   - { port: 443, protocol: tcp }
+#   - { port: 6443, protocol: tcp, interface: wg0 }
+firewall_allowed_ports: []
+
+# Разрешить входящий ICMP echo-request (ping). У ICMP нет портов, поэтому
+# это отдельный тумблер, а не элемент firewall_allowed_ports.
+firewall_allow_ping: true
+
+# После того как все ACCEPT-правила применены — поставить default-deny
+# policy на INPUT. FRONTDOOR при этом не содержит собственного финального
+# DROP: несовпавшие пакеты просто долетают до policy, что не мешает другим
+# управляющим цепочкам (например kube-proxy/kube-router на k3s-нодах)
+# первыми принять решение по трафику, который им причитается.
+firewall_set_input_policy_drop: true
+
+# Сохранять правила через iptables-persistent, чтобы они переживали reboot.
+firewall_persist: true

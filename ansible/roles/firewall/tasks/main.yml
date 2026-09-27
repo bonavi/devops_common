@@ -1,0 +1,85 @@
+- name: Install iptables-persistent
+  when: firewall_persist
+  block:
+    - name: Preseed iptables-persistent to not autosave existing rules on install
+      ansible.builtin.debconf:
+        name: iptables-persistent
+        question: "{{ item }}"
+        vtype: boolean
+        value: "false"
+      loop:
+        - iptables-persistent/autosave_v4
+        - iptables-persistent/autosave_v6
+
+    - name: Install iptables-persistent package
+      ansible.builtin.apt:
+        name: iptables-persistent
+        state: present
+        update_cache: yes
+
+- name: Ensure {{ firewall_chain }} chain exists
+  ansible.builtin.iptables:
+    chain: "{{ firewall_chain }}"
+    chain_management: true
+    state: present
+
+- name: Allow loopback traffic in {{ firewall_chain }}
+  ansible.builtin.iptables:
+    chain: "{{ firewall_chain }}"
+    in_interface: lo
+    jump: ACCEPT
+
+- name: Allow established/related traffic in {{ firewall_chain }}
+  ansible.builtin.iptables:
+    chain: "{{ firewall_chain }}"
+    ctstate:
+      - ESTABLISHED
+      - RELATED
+    jump: ACCEPT
+
+- name: Allow inbound ping (ICMP echo-request) in {{ firewall_chain }}
+  ansible.builtin.iptables:
+    chain: "{{ firewall_chain }}"
+    protocol: icmp
+    icmp_type: echo-request
+    jump: ACCEPT
+  when: firewall_allow_ping
+
+- name: Allow configured ports in {{ firewall_chain }}
+  ansible.builtin.iptables:
+    chain: "{{ firewall_chain }}"
+    protocol: "{{ item.protocol }}"
+    destination_port: "{{ item.port }}"
+    in_interface: "{{ item.interface | default(omit) }}"
+    jump: ACCEPT
+  loop: "{{ firewall_allowed_ports }}"
+  loop_control:
+    label: >-
+      {{ item.protocol }}/{{ item.port }}{{ (' via ' + item.interface) if item.interface is defined else '' }}
+
+# Вставляется первым (-I INPUT 1), но это не гарантирует, что она навсегда
+# останется первой строкой: например kube-router на k3s-нодах периодически
+# ресинхронизируется и переустанавливает свою цепочку перед любой другой.
+# Модуль идемпотентен по содержимому правила, а не по позиции — если jump
+# уже существует где-то в INPUT, повторный запуск не будет его двигать.
+- name: Call {{ firewall_chain }} from the top of INPUT
+  ansible.builtin.iptables:
+    chain: INPUT
+    jump: "{{ firewall_chain }}"
+    action: insert
+    rule_num: 1
+
+- name: Set default-deny policy on INPUT
+  ansible.builtin.iptables:
+    chain: INPUT
+    policy: DROP
+  when: firewall_set_input_policy_drop
+
+# Выполняется всегда (не только когда что-то изменилось выше) — правила
+# iptables не переживают reboot без этого шага, а любая роль, вызванная
+# после этой в том же плейбуке (например reboot), не должна оставить
+# только что настроенный firewall несохранённым.
+- name: Persist current iptables rules
+  ansible.builtin.command: netfilter-persistent save
+  when: firewall_persist
+  changed_when: false
