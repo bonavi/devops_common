@@ -1,0 +1,10 @@
+---
+# roles/node-exporter/defaults/main.yml
+
+# Опционально — закрыть /metrics базовой аутентификацией (defense-in-depth
+# поверх firewall, не замена ему). node_exporter_basic_auth_password_hash —
+# bcrypt-хэш, не пароль в открытом виде; задаётся в host_vars/<host>/secrets.yml
+# под ansible-vault. Сгенерировать: htpasswd -nBC 10 "" | tr -d ':\n'
+node_exporter_basic_auth_enabled: false
+node_exporter_basic_auth_username: prometheus
+node_exporter_basic_auth_password_hash: ""

@@ -1,4 +1,30 @@
 ---
+- name: Fail fast if basic auth enabled without a password hash
+  ansible.builtin.assert:
+    that:
+      - node_exporter_basic_auth_password_hash | length > 0
+    fail_msg: >-
+      node_exporter_basic_auth_enabled=true, но node_exporter_basic_auth_password_hash
+      пуст. Задать bcrypt-хэш в host_vars/{{ inventory_hostname }}/secrets.yml
+      (ansible-vault). Сгенерировать: htpasswd -nBC 10 "" | tr -d ':\n'
+  when: node_exporter_basic_auth_enabled | bool
+
+- name: Ensure project directory exists
+  ansible.builtin.file:
+    path: "{{ project_dir }}"
+    state: directory
+    mode: '0755'
+  when: node_exporter_basic_auth_enabled | bool
+
+- name: Deploy node_exporter web.yml (basic auth)
+  ansible.builtin.template:
+    src: web.yml.j2
+    dest: "{{ project_dir }}/node-exporter-web.yml"
+    mode: '0600'
+  # no_log: файл содержит bcrypt-хэш пароля.
+  no_log: true
+  when: node_exporter_basic_auth_enabled | bool
+
 - import_tasks: ../../docker-compose-app/tasks/deploy.yml
   vars:
     docker_compose_app_name: node-exporter

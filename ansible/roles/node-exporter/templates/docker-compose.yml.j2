@@ -9,8 +9,14 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /:/rootfs:ro
+{% if node_exporter_basic_auth_enabled | bool %}
+      - {{ project_dir }}/node-exporter-web.yml:/etc/node_exporter/web.yml:ro
+{% endif %}
     command:
       - '--path.procfs=/host/proc'
       - '--path.rootfs=/rootfs'
       - '--path.sysfs=/host/sys'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+{% if node_exporter_basic_auth_enabled | bool %}
+      - '--web.config.file=/etc/node_exporter/web.yml'
+{% endif %}
