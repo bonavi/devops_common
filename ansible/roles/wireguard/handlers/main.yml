@@ -1,5 +1,5 @@
 ---
-# roles/wireguard_server/handlers/main.yml
+# roles/wireguard/handlers/main.yml
 
 - name: restart wireguard
   ansible.builtin.systemd:

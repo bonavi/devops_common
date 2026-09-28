@@ -1,0 +1,42 @@
+---
+# roles/wireguard/defaults/main.yml
+#
+# Одна роль на любую роль узла в WG-сети — сам протокол не различает
+# "сервер" и "клиент" (см. wireguard.md, глава 1), только peer'ы. Разница
+# между хабом и spoke'ом — не код роли, а то, что лежит в host_vars:
+# - хаб: задан wireguard_listen_port, wireguard_peers содержит несколько
+#   записей, обычно без endpoint/persistent_keepalive (роуминг, глава 4).
+# - spoke/клиент: wireguard_listen_port не задан, wireguard_peers — как
+#   правило один peer (хаб), с endpoint и persistent_keepalive.
+
+wireguard_interface: wg0
+wireguard_config_dir: /etc/wireguard
+
+# Собственный адрес этого узла в WG-сети, например "10.10.10.1/24" (обязателен)
+wireguard_address: ""
+
+# Задать, только если этот узел должен принимать входящие подключения
+# (роль хаба) — тогда wg слушает на фиксированном UDP-порту. Для spoke/клиента
+# оставить пустым: ему не нужен фиксированный слушающий порт.
+wireguard_listen_port: ""
+
+# Обязателен, задаётся в host_vars/<host>/secrets.yml под ansible-vault.
+# Дефолта нет намеренно: пустое значение отсекает assert в роли, а не молча
+# порождает конфиг с невалидным ключом.
+
+# Список peer'ов этого узла.
+#
+# wireguard_peers:
+#   # запись хаба про spoke — без endpoint, spoke сам инициирует (роуминг)
+#   - name: raspberry-pi
+#     public_key: "ABCDEF...="
+#     allowed_ips: ["10.10.10.2/32"]
+#   # запись spoke/клиента про хаб — endpoint обязателен, плюс keepalive за NAT
+#   - name: hub
+#     public_key: "ABCDEF...="
+#     allowed_ips: ["10.10.10.0/24"]
+#     endpoint: "coin-1.bonavii.com:51820"
+#     persistent_keepalive: 25
+wireguard_peers: []
+
+wireguard_enabled: true

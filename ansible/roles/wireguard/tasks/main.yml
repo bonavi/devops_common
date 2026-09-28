@@ -1,11 +1,11 @@
 ---
-# roles/wireguard_server/tasks/main.yml
+# roles/wireguard/tasks/main.yml
 
-- name: Fail fast if server address is missing
+- name: Fail fast if address is missing
   ansible.builtin.assert:
     that:
       - wireguard_address | length > 0
-    fail_msg: "wireguard_address обязателен для сервера (host_vars/{{ inventory_hostname }}/env.yml)"
+    fail_msg: "wireguard_address обязателен (host_vars/{{ inventory_hostname }}/env.yml)"
 
 - name: Install WireGuard
   ansible.builtin.apt:
@@ -58,14 +58,9 @@
   no_log: true
   notify: restart wireguard
 
-# --- Firewall ------------------------------------------------------------------
-
-- name: Open WireGuard UDP port in ufw
-  community.general.ufw:
-    rule: allow
-    port: "{{ wireguard_listen_port }}"
-    proto: udp
-  when: wireguard_manage_firewall | bool
+# Firewall (открыть wireguard_listen_port/udp, если задан) — не эта роль,
+# а роль firewall (firewall_allowed_ports). Не дублируем управление
+# правилами в двух разных местах.
 
 # --- Автозапуск ------------------------------------------------------------------
 
@@ -74,4 +69,3 @@
     name: "wg-quick@{{ wireguard_interface }}"
     enabled: "{{ wireguard_enabled }}"
     state: started
-

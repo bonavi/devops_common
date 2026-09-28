@@ -75,6 +75,24 @@
     policy: DROP
   when: firewall_set_input_policy_drop
 
+# Хост не пользуется IPv6 — глушим весь входящий/транзитный трафик целиком,
+# без единого ACCEPT-исключения (в отличие от IPv4-FRONTDOOR выше). Забыть
+# про ip6tables — частый способ оставить дыру: IPv4-firewall никак его не
+# защищает, у IPv6 полностью отдельный набор правил и своя policy.
+- name: Set default-deny policy on IPv6 INPUT
+  ansible.builtin.iptables:
+    chain: INPUT
+    policy: DROP
+    ip_version: ipv6
+  when: firewall_block_ipv6
+
+- name: Set default-deny policy on IPv6 FORWARD
+  ansible.builtin.iptables:
+    chain: FORWARD
+    policy: DROP
+    ip_version: ipv6
+  when: firewall_block_ipv6
+
 # Выполняется всегда (не только когда что-то изменилось выше) — правила
 # iptables не переживают reboot без этого шага, а любая роль, вызванная
 # после этой в том же плейбуке (например reboot), не должна оставить

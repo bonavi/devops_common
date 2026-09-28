@@ -24,5 +24,10 @@ firewall_allow_ping: true
 # первыми принять решение по трафику, который им причитается.
 firewall_set_input_policy_drop: true
 
+# Хост не пользуется IPv6 — глушить его целиком (policy DROP на INPUT
+# и FORWARD в ip6tables, без единого ACCEPT). Если IPv6 всё же нужен —
+# выключи и добавь свои ACCEPT-правила отдельно, эта роль их не заводит.
+firewall_block_ipv6: true
+
 # Сохранять правила через iptables-persistent, чтобы они переживали reboot.
 firewall_persist: true

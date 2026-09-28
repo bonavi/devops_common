@@ -13,6 +13,51 @@
     regexp: '\sswap\s'
     state: absent
 
+# /etc/rancher/k3s/config.yaml — единственный конфиг-файл, который k3s
+# гарантированно читает и при установке, и при каждом рестарте сервиса
+# (задокументированное поведение, в отличие от config.yaml.d — его
+# поддержку для конкретной версии k3s стоит проверять отдельно, не
+# полагаемся на неё здесь). blockinfile патчит только СВОЙ помеченный
+# блок внутри файла — не трогает остальное содержимое, если оно там
+# появится другим путём, идемпотентно (повторный запуск не дублирует),
+# и сам себя убирает, если условие перестало выполняться.
+# tls-san добавляется, только если у хоста задан wireguard_address (тот же,
+# что использует роль wireguard) — иначе apiserver сгенерирует
+# сертификат без SAN на WG-IP, и kubectl/curl через туннель будет падать
+# с "x509: certificate is valid for ..., not <wg-ip>". tls-san в k3s
+# аддитивен — расширяет автоматически определяемый список SAN, не заменяет
+# его, так что уже обнаруженные адреса (реальный IP хоста, ClusterIP,
+# loopback) остаются в сертификате как были.
+- name: Ensure /etc/rancher/k3s directory exists
+  ansible.builtin.file:
+    path: /etc/rancher/k3s
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Patch tls-san into k3s config.yaml
+  ansible.builtin.blockinfile:
+    path: /etc/rancher/k3s/config.yaml
+    create: yes
+    owner: root
+    group: root
+    mode: '0644'
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - wireguard tls-san"
+    block: |
+      tls-san:
+        - "{{ wireguard_address.split('/')[0] }}"
+  when: (wireguard_address | default('')) | length > 0
+  notify: Restart k3s
+
+- name: Remove tls-san block when wireguard_address is not set
+  ansible.builtin.blockinfile:
+    path: /etc/rancher/k3s/config.yaml
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - wireguard tls-san"
+    state: absent
+  when: (wireguard_address | default('')) | length == 0
+  notify: Restart k3s
+
 - name: Install k3s using official script
   shell: |
     curl -sfL https://get.k3s.io | sh -s - \
