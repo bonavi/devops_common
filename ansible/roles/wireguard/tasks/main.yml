@@ -1,11 +1,11 @@
 ---
 # roles/wireguard/tasks/main.yml
 
-- name: Fail fast if address is missing
+- name: Fail fast if no wireguard configuration defined
   ansible.builtin.assert:
     that:
-      - wireguard_address | length > 0
-    fail_msg: "wireguard_address обязателен (host_vars/{{ inventory_hostname }}/env.yml)"
+      - wireguard | length > 0
+    fail_msg: "wireguard (список конфигураций интерфейсов) пуст — нечего разворачивать"
 
 - name: Install WireGuard
   ansible.builtin.apt:
@@ -21,51 +21,12 @@
     group: root
     mode: "0700"
 
-# --- Ключи -----------------------------------------------------------------
-
-# Приватный ключ приходит из ansible-vault (host_vars/<host>/secrets.yml).
-# Генерации на хосте больше нет: ключ, созданный на месте, существовал в одном
-# экземпляре и терялся вместе с диском, а публичный приходилось вычитывать из
-# вывода роли и вручную переносить в env.yml другого хоста.
-- name: Fail fast if private key is not provided from vault
-  ansible.builtin.assert:
-    that:
-      - wireguard_private_key is defined
-      - wireguard_private_key | length == 44
-    fail_msg: >-
-      wireguard_private_key обязателен и должен лежать в host_vars/{{ inventory_hostname }}/secrets.yml
-      (ansible-vault). Сгенерировать новую пару: wg genkey | tee /dev/stderr | wg pubkey
-
-# Ключ подставляется в wg0.conf напрямую (шаблон ниже), отдельный файл
-# privatekey не нужен — убираем оставшийся от прежней схемы, чтобы копия
-# ключа не лежала на диске в двух местах.
-- name: Remove leftover on-host private key file
-  ansible.builtin.file:
-    path: "{{ wireguard_config_dir }}/privatekey"
-    state: absent
-
-# --- Конфиг ------------------------------------------------------------------
-
-- name: Deploy wg0.conf
-  ansible.builtin.template:
-    src: wg0.conf.j2
-    dest: "{{ wireguard_config_dir }}/{{ wireguard_interface }}.conf"
-    owner: root
-    group: root
-    mode: "0600"
-  # no_log: в конфиг подставляется приватный ключ, и при --diff / -v Ansible
-  # вывел бы его целиком в терминал и в логи CI.
-  no_log: true
-  notify: restart wireguard
-
-# Firewall (открыть wireguard_listen_port/udp, если задан) — не эта роль,
-# а роль firewall (firewall_allowed_ports). Не дублируем управление
-# правилами в двух разных местах.
-
-# --- Автозапуск ------------------------------------------------------------------
-
-- name: Enable and start WireGuard interface
-  ansible.builtin.systemd:
-    name: "wg-quick@{{ wireguard_interface }}"
-    enabled: "{{ wireguard_enabled }}"
-    state: started
+# Один интерфейс — отдельный набор задач (interface.yml), потому что loop
+# по block'у Ansible не поддерживает; include_tasks с loop — штатный способ
+# прогнать несколько шагов на каждый элемент списка.
+- name: Configure each WireGuard interface
+  ansible.builtin.include_tasks: interface.yml
+  loop: "{{ wireguard }}"
+  loop_control:
+    loop_var: wg
+    label: "{{ wg.interface | default('?') }}"
