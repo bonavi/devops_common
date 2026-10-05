@@ -50,12 +50,21 @@
   when: (wireguard_address | default('')) | length > 0
   notify: Restart k3s
 
+# На свежем сервере config.yaml ещё нет — убирать блок не из чего
+- name: Check k3s config.yaml exists
+  ansible.builtin.stat:
+    path: /etc/rancher/k3s/config.yaml
+  register: k3s_config_file
+  when: (wireguard_address | default('')) | length == 0
+
 - name: Remove tls-san block when wireguard_address is not set
   ansible.builtin.blockinfile:
     path: /etc/rancher/k3s/config.yaml
     marker: "# {mark} ANSIBLE MANAGED BLOCK - wireguard tls-san"
     state: absent
-  when: (wireguard_address | default('')) | length == 0
+  when:
+    - (wireguard_address | default('')) | length == 0
+    - k3s_config_file.stat.exists
   notify: Restart k3s
 
 - name: Install k3s using official script
