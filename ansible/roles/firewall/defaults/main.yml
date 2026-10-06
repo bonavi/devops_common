@@ -6,11 +6,16 @@ firewall_chain: FRONTDOOR
 # Список разрешённых входящих портов.
 # interface — опционально: ограничивает правило конкретным интерфейсом
 # (например wg0), иначе порт открыт с любого интерфейса.
+# source — опционально: ограничивает по source IP/CIDR (например конкретное
+# устройство в LAN). Слабее interface (IP можно подделать теоретически,
+# динамический IP ломает правило молча) — использовать, когда нет отдельного
+# интерфейса под нужный источник (весь LAN на одном eth0).
 #
 # firewall_allowed_ports:
 #   - { port: 80, protocol: tcp }
 #   - { port: 443, protocol: tcp }
 #   - { port: 6443, protocol: tcp, interface: wg0 }
+#   - { port: 1883, protocol: tcp, source: "192.168.1.50/32" }
 firewall_allowed_ports: []
 
 # Разрешить входящий ICMP echo-request (ping). У ICMP нет портов, поэтому

@@ -21,8 +21,8 @@
 # блок внутри файла — не трогает остальное содержимое, если оно там
 # появится другим путём, идемпотентно (повторный запуск не дублирует),
 # и сам себя убирает, если условие перестало выполняться.
-# tls-san добавляется, только если у хоста задан wireguard_address (тот же,
-# что использует роль wireguard) — иначе apiserver сгенерирует
+# tls-san добавляется, только если у хоста задан wireguard (список
+# интерфейсов роли wireguard; берутся адреса всех интерфейсов) — иначе apiserver сгенерирует
 # сертификат без SAN на WG-IP, и kubectl/curl через туннель будет падать
 # с "x509: certificate is valid for ..., not <wg-ip>". tls-san в k3s
 # аддитивен — расширяет автоматически определяемый список SAN, не заменяет
@@ -46,8 +46,10 @@
     marker: "# {mark} ANSIBLE MANAGED BLOCK - wireguard tls-san"
     block: |
       tls-san:
-        - "{{ wireguard_address.split('/')[0] }}"
-  when: (wireguard_address | default('')) | length > 0
+      {% for ip in wireguard | map(attribute='address') | flatten | map('regex_replace', '/.*$', '') | unique %}
+        - "{{ ip }}"
+      {% endfor %}
+  when: (wireguard | default([])) | length > 0
   notify: Restart k3s
 
 # На свежем сервере config.yaml ещё нет — убирать блок не из чего
@@ -55,15 +57,15 @@
   ansible.builtin.stat:
     path: /etc/rancher/k3s/config.yaml
   register: k3s_config_file
-  when: (wireguard_address | default('')) | length == 0
+  when: (wireguard | default([])) | length == 0
 
-- name: Remove tls-san block when wireguard_address is not set
+- name: Remove tls-san block when wireguard is not set
   ansible.builtin.blockinfile:
     path: /etc/rancher/k3s/config.yaml
     marker: "# {mark} ANSIBLE MANAGED BLOCK - wireguard tls-san"
     state: absent
   when:
-    - (wireguard_address | default('')) | length == 0
+    - (wireguard | default([])) | length == 0
     - k3s_config_file.stat.exists
   notify: Restart k3s
 

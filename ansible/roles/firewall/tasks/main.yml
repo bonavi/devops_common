@@ -51,11 +51,18 @@
     protocol: "{{ item.protocol }}"
     destination_port: "{{ item.port }}"
     in_interface: "{{ item.interface | default(omit) }}"
+    # Опционально — сузить и по source IP/CIDR (например конкретное
+    # LAN-устройство). Слабее, чем interface (глава 5.3 iptables.md —
+    # IP можно подделать теоретически, динамический IP ломает правило
+    # молча), но иногда единственный доступный рычаг: если весь LAN
+    # приходит на один физический интерфейс, а выделенного
+    # WG-интерфейса под конкретное устройство нет.
+    source: "{{ item.source | default(omit) }}"
     jump: ACCEPT
   loop: "{{ firewall_allowed_ports }}"
   loop_control:
     label: >-
-      {{ item.protocol }}/{{ item.port }}{{ (' via ' + item.interface) if item.interface is defined else '' }}
+      {{ item.protocol }}/{{ item.port }}{{ (' via ' + item.interface) if item.interface is defined else '' }}{{ (' from ' + item.source) if item.source is defined else '' }}
 
 # Вставляется первым (-I INPUT 1), но это не гарантирует, что она навсегда
 # останется первой строкой: например kube-router на k3s-нодах периодически
