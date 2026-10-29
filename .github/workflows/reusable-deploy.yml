@@ -31,8 +31,8 @@ on:
         required: false
         type: string
         default: ''
-      # Полные пути секретов в Vault (vault/terraform/secrets.tf в devops-репозитории), например ci/coin/read-submodules.
-      # Ключи внутри: PAT_TOKEN, KUBECONFIG, SOPS_AGE, TG_*/GRAFANA_*
+      # Полные пути секретов в Vault (vault/terraform/secrets.tf в devops-репозитории), например coin/ci/github-pat.
+      # Ключи внутри: PAT_TOKEN, KUBECONFIG, TG_*/GRAFANA_*
       vault_pat_secret:
         required: false
         type: string
@@ -41,6 +41,9 @@ on:
         required: false
         type: string
         default: ''
+      # Устарело и не используется: секреты кластера теперь из Vault через VSO, SOPS не нужен.
+      # Оставлено, чтобы не падали вызовы, которые ещё передают его (prod-workflow на main, старые теги).
+      # Удалить, когда ни один вызов его не передаёт
       vault_sops_secret:
         required: false
         type: string
@@ -157,8 +160,7 @@ jobs:
           jwtGithubAudience: https://github.com/${{ github.repository_owner }}
           secrets: |
             secret/data/${{ inputs.vault_pat_secret }} PAT_TOKEN ;
-            secret/data/${{ inputs.vault_kubeconfig_secret }} KUBECONFIG | KUBECONFIG_CONTENT ;
-            secret/data/${{ inputs.vault_sops_secret }} SOPS_AGE
+            secret/data/${{ inputs.vault_kubeconfig_secret }} KUBECONFIG | KUBECONFIG_CONTENT
 
       # Конфиг WireGuard — отдельным шагом, чтобы без VPN не запрашивать пустой путь
       - name: Import WireGuard config from Vault
@@ -195,10 +197,6 @@ jobs:
         run: |
           mkdir -p ~/.kube
           printf '%s' "${{ env.KUBECONFIG_CONTENT || secrets.KUBECONFIG }}" > ~/.kube/config
-
-      - name: Setup SOPS age key
-        run: |
-          printf '%s' "${{ env.SOPS_AGE || secrets.SOPS_AGE }}" > k8s/secrets/key.txt
 
       - name: Deploy
         id: deploy

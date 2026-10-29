@@ -3,7 +3,6 @@
 # Переменные: ACTION, ENV, RELEASE (all — все релизы окружения), APP_VERSION, RELEASE_TIMEOUT, KUBE_USER
 source "$(dirname "$0")/lib.sh"
 
-export SOPS_AGE_KEY_FILE="$ROOT/k8s/secrets/key.txt"
 helmfile_file="$ROOT/k8s/helmfile.yaml"
 
 action="$(choose "Действие" "${ACTION:-}" apply sync diff template destroy restore-db kubeconfig)" || exit 1
