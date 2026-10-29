@@ -156,6 +156,7 @@ jobs:
         with:
           repository: ${{ inputs.devops_repository }}
           token: '${{ env.PAT_TOKEN || secrets.PAT_TOKEN }}'
+          submodules: true
 
       - name: Install make
         run: apk add --no-cache make
