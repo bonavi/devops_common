@@ -14,7 +14,10 @@
 #
 # Один файл в backups/ = один запуск psql/pg_restore = один рестор.
 #
-# Скрипт общий (лежит в common), а секреты — в конкретном проекте, поэтому
+# Пароль пользователя БД — из Vault: secret/infra/postgres/<env>/<db_user>, ключ password
+# (нужны VAULT_ADDR и vault login).
+#
+# Скрипт общий (лежит в common), а конфиг — в конкретном проекте, поэтому
 # путь к ним не выводится из расположения скрипта напрямую: common
 # монтируется submodule'ом в корень devops-репозитория одинаково во всех
 # проектах, так что K8S_DIR по умолчанию — <корень репозитория>/k8s
@@ -66,8 +69,7 @@ for FILE in "${FILES[@]}"; do
   DB_USER="${BASENAME%.*}"
   [[ "$BASENAME" == *.tar.gz ]] && DB_USER="${BASENAME%.tar.gz}"
 
-  PASSWORD="$(sops -d --extract "[\"pgsql\"][\"users\"][\"${DB_USER}\"][\"password\"]" \
-    "$K8S_DIR/secrets/secrets-${ENV}.yaml")"
+  PASSWORD="$(vault kv get -mount=secret -field=password "infra/postgres/${ENV}/${DB_USER}")"
 
   echo "==> Restoring ${BASENAME} into ${DB_USER}@${NAMESPACE} (pod ${POD})"
   case "$BASENAME" in

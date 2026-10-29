@@ -10,10 +10,6 @@ help:
 edit-ansible-secrets:
 	@$(SCRIPTS)/edit-ansible-secrets.sh
 
-# Секреты окружения k3s (SOPS).            ENV=prod|dev
-edit-k3s-secrets:
-	@$(SCRIPTS)/edit-k3s-secrets.sh
-
 # Ansible-плейбук.                         GROUP=vpn-server PLAYBOOK=deploy-xray-agent HOST=all
 run-ansible-playbook:
 	@$(SCRIPTS)/run-ansible-playbook.sh
@@ -23,4 +19,4 @@ run-ansible-playbook:
 do-k3s:
 	@$(SCRIPTS)/do-k3s.sh
 
-.PHONY: help edit-ansible-secrets edit-k3s-secrets run-ansible-playbook do-k3s
+.PHONY: help edit-ansible-secrets run-ansible-playbook do-k3s
