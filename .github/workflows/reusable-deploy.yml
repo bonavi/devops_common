@@ -49,6 +49,12 @@ on:
         required: false
         type: string
         default: ''
+      # Конфиг WireGuard (ключ WG_CONFIG) — если kube-apiserver доступен только через VPN.
+      # Пусто — без VPN
+      vault_wireguard_secret:
+        required: false
+        type: string
+        default: ''
 
 env:
   REGISTRY: ghcr.io
@@ -136,6 +142,8 @@ jobs:
       id-token: write
     container:
       image: ghcr.io/helmfile/helmfile:latest
+      # Права на сетевой интерфейс — для подключения к WireGuard
+      options: --cap-add=NET_ADMIN --device /dev/net/tun
     steps:
       # Секреты из Vault по GitHub OIDC; если не вышло — берутся секреты GitHub
       - name: Import secrets from Vault
@@ -151,6 +159,28 @@ jobs:
             secret/data/${{ inputs.vault_pat_secret }} PAT_TOKEN ;
             secret/data/${{ inputs.vault_kubeconfig_secret }} KUBECONFIG | KUBECONFIG_CONTENT ;
             secret/data/${{ inputs.vault_sops_secret }} SOPS_AGE
+
+      # Конфиг WireGuard — отдельным шагом, чтобы без VPN не запрашивать пустой путь
+      - name: Import WireGuard config from Vault
+        uses: hashicorp/vault-action@v3
+        if: inputs.vault_role != '' && inputs.vault_wireguard_secret != ''
+        with:
+          url: ${{ env.VAULT_ADDR }}
+          method: jwt
+          role: ${{ inputs.vault_role }}
+          jwtGithubAudience: https://github.com/${{ github.repository_owner }}
+          secrets: |
+            secret/data/${{ inputs.vault_wireguard_secret }} WG_CONFIG
+
+      # Поднимаем туннель до кластера: kube-apiserver слушает только на wg0
+      - name: Connect WireGuard
+        if: env.WG_CONFIG != ''
+        run: |
+          apk add --no-cache wireguard-tools iproute2
+          mkdir -p /etc/wireguard
+          printf '%s\n' "$WG_CONFIG" > /etc/wireguard/wg0.conf
+          chmod 600 /etc/wireguard/wg0.conf
+          wg-quick up wg0
 
       - uses: actions/checkout@v4
         with:
