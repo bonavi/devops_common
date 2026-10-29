@@ -1,0 +1,311 @@
+name: reusable-deploy
+
+on:
+  workflow_call:
+    inputs:
+      image_name:
+        required: true
+        type: string
+      make_command:
+        required: true
+        type: string
+      devops_repository:
+        required: true
+        type: string
+      # Механизм деплоя: helmfile (k8s) или ansible (docker compose на серверах)
+      deploy_method:
+        required: false
+        type: string
+        default: 'helmfile'
+      build_mode:
+        required: false
+        type: string
+        default: ''
+      ga_measurement_id:
+        required: false
+        type: string
+        default: ''
+      # Роль Vault для этого кейса (vault/terraform/roles-github.tf в devops-репозитории), например gh-finfix-go-server-deploy-dev.
+      # Пусто — секреты берутся только из GitHub
+      vault_role:
+        required: false
+        type: string
+        default: ''
+      # Полные пути секретов в Vault (vault/terraform/secrets.tf в devops-репозитории), например ci/coin/read-submodules.
+      # Ключи внутри: PAT_TOKEN, KUBECONFIG, SOPS_AGE, TG_*/GRAFANA_*
+      vault_pat_secret:
+        required: false
+        type: string
+        default: ''
+      vault_kubeconfig_secret:
+        required: false
+        type: string
+        default: ''
+      vault_sops_secret:
+        required: false
+        type: string
+        default: ''
+      vault_notify_secret:
+        required: false
+        type: string
+        default: ''
+
+env:
+  REGISTRY: ghcr.io
+  VAULT_ADDR: https://vault.bonavii.com
+
+jobs:
+
+  # Собираем и пушим Docker-образ
+  docker-build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build_tag: ${{ steps.version.outputs.build_tag }}
+
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+      # Секреты из Vault по GitHub OIDC; если не вышло — берутся секреты GitHub
+      - name: Import secrets from Vault
+        uses: hashicorp/vault-action@v3
+        if: inputs.vault_role != ''
+        continue-on-error: true
+        with:
+          url: ${{ env.VAULT_ADDR }}
+          method: jwt
+          role: ${{ inputs.vault_role }}
+          jwtGithubAudience: https://github.com/${{ github.repository_owner }}
+          secrets: |
+            secret/data/${{ inputs.vault_pat_secret }} PAT_TOKEN
+
+      - uses: actions/checkout@v4
+
+      - name: Extract version from ref
+        id: version
+        run: |
+          VERSION=${GITHUB_REF##*/}
+          BUILD=$(git rev-parse --short HEAD)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "BUILD=$BUILD" >> $GITHUB_ENV
+          echo "BUILD_DATE=$(git log -1 --format=%cd --date=format:'%Y-%m-%d %H:%M:%S')" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "build_tag=build-$BUILD" >> $GITHUB_OUTPUT
+
+      - name: Login to the Container registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download submodules
+        run: |
+          git submodule update --init --recursive
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          file: build/Dockerfile
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ inputs.image_name }}:${{ env.VERSION }}
+            ${{ env.REGISTRY }}/${{ inputs.image_name }}:latest
+            ${{ env.REGISTRY }}/${{ inputs.image_name }}:build-${{ env.BUILD }}
+          build-args: |
+            CI_JOB_TOKEN=${{ env.PAT_TOKEN || secrets.PAT_TOKEN }}
+            VERSION=${{ env.VERSION }}
+            BUILD=${{ env.BUILD }}
+            BUILD_DATE=${{ env.BUILD_DATE }}
+            BUILD_MODE=${{ inputs.build_mode }}
+            GA_MEASUREMENT_ID=${{ inputs.ga_measurement_id }}
+
+  # Деплой через Helmfile (k8s)
+  helmfile-deploy:
+    if: inputs.deploy_method == 'helmfile'
+    needs: docker-build-and-push
+    env:
+      VERSION: ${{ needs.docker-build-and-push.outputs.version }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    container:
+      image: ghcr.io/helmfile/helmfile:latest
+    steps:
+      # Секреты из Vault по GitHub OIDC; если не вышло — берутся секреты GitHub
+      - name: Import secrets from Vault
+        uses: hashicorp/vault-action@v3
+        if: inputs.vault_role != ''
+        continue-on-error: true
+        with:
+          url: ${{ env.VAULT_ADDR }}
+          method: jwt
+          role: ${{ inputs.vault_role }}
+          jwtGithubAudience: https://github.com/${{ github.repository_owner }}
+          secrets: |
+            secret/data/${{ inputs.vault_pat_secret }} PAT_TOKEN ;
+            secret/data/${{ inputs.vault_kubeconfig_secret }} KUBECONFIG | KUBECONFIG_CONTENT ;
+            secret/data/${{ inputs.vault_sops_secret }} SOPS_AGE
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.devops_repository }}
+          token: '${{ env.PAT_TOKEN || secrets.PAT_TOKEN }}'
+
+      - name: Install make
+        run: apk add --no-cache make
+
+      - name: Setup kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          printf '%s' "${{ env.KUBECONFIG_CONTENT || secrets.KUBECONFIG }}" > ~/.kube/config
+
+      - name: Setup SOPS age key
+        run: |
+          printf '%s' "${{ env.SOPS_AGE || secrets.SOPS_AGE }}" > k8s/secrets/key.txt
+
+      - name: Deploy
+        id: deploy
+        env:
+          APP_VERSION: ${{ needs.docker-build-and-push.outputs.build_tag }}
+          RELEASE_TIMEOUT: ${{ vars.RELEASE_TIMEOUT || '180' }}
+        run: |
+          make ${{ inputs.make_command }}
+
+  # Деплой через Ansible (docker compose на серверах)
+  ansible-deploy:
+    if: inputs.deploy_method == 'ansible'
+    needs: docker-build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    container:
+      image: willhallonline/ansible:latest
+    steps:
+      # Секретов для ansible в Vault пока нет — берутся секреты GitHub
+
+      # Переключаемся в devops репозиторий
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.devops_repository }}
+          token: '${{ env.PAT_TOKEN || secrets.PAT_TOKEN }}'
+
+      # Настраиваем ssh
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ env.SSH_KEY || secrets.SSH_KEY }}" > ~/.ssh/id_ed25519_devops_vpn
+          chmod 600 ~/.ssh/id_ed25519_devops_vpn
+
+      - name: Install Make
+        run: |
+          apk update && apk add make
+
+      # Создаем файл с паролем для Ansible Vault
+      - name: Make file with vault password
+        run: |
+          printf '%s' "${{ env.ANSIBLE_VAULT_PASSWORD || secrets.VAULT_PASSWORD }}" > ansible/config/.vault_password
+
+      # Запускаем Ansible playbook
+      - name: Run Ansible playbook
+        run: |
+          ANSIBLE_HOST_KEY_CHECKING=False make ${{ inputs.make_command }}
+
+  # Уведомления о результате деплоя (общая джоба для обоих механизмов)
+  # Запускается всегда: и при упавшем билде образа (оба деплоя skipped), и после деплоя
+  notify:
+    if: always()
+    needs: [docker-build-and-push, helmfile-deploy, ansible-deploy]
+    env:
+      VERSION: ${{ needs.docker-build-and-push.outputs.version }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      # Секреты из Vault по GitHub OIDC; если не вышло — берутся секреты GitHub
+      - name: Import secrets from Vault
+        uses: hashicorp/vault-action@v3
+        if: inputs.vault_role != ''
+        continue-on-error: true
+        with:
+          url: ${{ env.VAULT_ADDR }}
+          method: jwt
+          role: ${{ inputs.vault_role }}
+          jwtGithubAudience: https://github.com/${{ github.repository_owner }}
+          secrets: |
+            secret/data/${{ inputs.vault_notify_secret }} TG_BOT_TOKEN ;
+            secret/data/${{ inputs.vault_notify_secret }} TG_CHAT_ID ;
+            secret/data/${{ inputs.vault_notify_secret }} TG_TOPIC_ID ;
+            secret/data/${{ inputs.vault_notify_secret }} GRAFANA_API_TOKEN ;
+            secret/data/${{ inputs.vault_notify_secret }} GRAFANA_URL
+
+      - name: Notify
+        run: |
+          escape_html() {
+            printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'
+          }
+
+          VERSION="${{ env.VERSION }}"
+          SAFE_VERSION=$(escape_html "$VERSION")
+          SAFE_COMMIT_TITLE=$(escape_html "${{ github.event.head_commit.message }}")
+
+          if [ "${{ needs.helmfile-deploy.result }}" = "success" ] || [ "${{ needs.ansible-deploy.result }}" = "success" ]; then
+            STATUS_ICON="✅"
+            STATUS_TEXT="<b>Задеплоились</b>"
+          else
+            STATUS_ICON="🚨"
+            STATUS_TEXT="<b>Деплой зафейлился</b>"
+          fi
+
+          MESSAGE="$STATUS_ICON CI: $STATUS_TEXT
+
+          🧩 <b>Project:</b> ${{ github.event.repository.name }}
+          🏷 <b>Version:</b> ${SAFE_VERSION}
+          🏗 <b>Build:</b> build-$(echo "${{ github.sha }}" | cut -c1-7)
+          📝 <b>Message:</b> ${SAFE_COMMIT_TITLE}
+          👤 <b>By:</b> ${{ github.actor }}
+          🔧 <b>Command:</b> ${{ inputs.make_command }}
+
+          🔗 ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+
+          curl -s -X POST -H "Content-Type: application/json" -d "{
+            \"chat_id\": \"${{ env.TG_CHAT_ID || vars.TG_CHAT_ID }}\",
+            \"message_thread_id\": \"${{ env.TG_TOPIC_ID || vars.TG_TOPIC_ID }}\",
+            \"parse_mode\": \"HTML\",
+            \"text\": \"$MESSAGE\",
+            \"disable_notification\": true,
+            \"disable_web_page_preview\": true
+          }" https://api.telegram.org/bot${{ env.TG_BOT_TOKEN || secrets.TG_BOT_TOKEN }}/sendMessage
+
+          GRAFANA_MESSAGE="$STATUS_ICON Deploy
+          🧩 Project: ${{ github.event.repository.name }}
+          🏷 Version: ${VERSION}
+          🏗 Build: build-$(echo "${{ github.sha }}" | cut -c1-7)
+          📝 Message: ${{ github.event.head_commit.message }}
+          👤 By: ${{ github.actor }}
+          🔧 Command: ${{ inputs.make_command }}
+          🔗 ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+
+          JSON_TEXT=$(printf '%s' "$GRAFANA_MESSAGE" \
+            | sed \
+            -e 's/\\/\\\\/g' \
+            -e 's/"/\\"/g' \
+            -e ':a;N;$!ba;s/\n/\\n/g')
+
+          ANNOTATION_TIME=$(($(date +%s) * 1000))
+
+          curl -s -X POST \
+            -H "Authorization: Bearer ${{ env.GRAFANA_API_TOKEN || secrets.GRAFANA_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            "${{ env.GRAFANA_URL || vars.GRAFANA_URL }}/api/annotations" \
+            -d "{
+              \"time\": ${ANNOTATION_TIME},
+              \"text\": \"${JSON_TEXT}\",
+              \"tags\": [\"ci\", \"deploy\", \"${{ github.event.repository.name }}\", \"${{ inputs.make_command }}\"]
+            }"
