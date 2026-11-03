@@ -49,3 +49,19 @@ run() {
 	echo "+ $*" >&2
 	"$@"
 }
+
+# load_sops_key — даёт sops ключ проекта. Если задан SOPS_KEYCHAIN_SERVICE, читает его из Keychain
+# один раз на запуск: helmfile расшифровывает несколько раз, а пароль спросится один раз.
+# Иначе, как раньше и как в CI, берёт файл k8s/secrets/key.txt
+load_sops_key() {
+	if [ -z "${SOPS_KEYCHAIN_SERVICE:-}" ] || ! command -v security >/dev/null; then
+		export SOPS_AGE_KEY_FILE="$ROOT/k8s/secrets/key.txt"
+		return
+	fi
+	unset SOPS_AGE_KEY_FILE
+	SOPS_AGE_KEY="$(security find-generic-password -a "$USER" -s "$SOPS_KEYCHAIN_SERVICE" -w)" || {
+		echo "Не удалось прочитать ключ $SOPS_KEYCHAIN_SERVICE из Keychain" >&2
+		exit 1
+	}
+	export SOPS_AGE_KEY
+}
