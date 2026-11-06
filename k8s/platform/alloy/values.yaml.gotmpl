@@ -1,0 +1,72 @@
+# Grafana Alloy — один DaemonSet на кластер: логи подов → Loki, OTLP → Tempo, pprof → Pyroscope.
+# Метрики собирает Prometheus (kube-prometheus-stack), не Alloy.
+#
+# Конфиг собирается из файлов рядом (пути — от этого файла):
+#   log-stages/NN-имя.alloy — стадии разбора логов (порядок — по NN)
+#   blocks/NN-имя.alloy     — компоненты конвейера
+# Проект дополняет их в config/alloy/cluster-values.yaml (values окружения):
+#   alloy.logStages.<NN-имя>: |  ...текст стадии...   — добавить/заменить, null — убрать базовую
+#   alloy.blocks.<NN-имя>: |  ...текст блока...        — то же для компонентов
+# Флаги кластера (cluster.yaml): cluster.features.tracing — OTLP → Tempo,
+#                                cluster.features.profiling — pprof → Pyroscope.
+{{- $cfg := .Values | get "alloy" dict }}
+{{- $features := .Values.cluster | get "features" dict }}
+
+{{- /* Стадии разбора логов */}}
+{{- $stages := dict }}
+{{- range $f := readDir "log-stages" }}
+{{- $_ := set $stages (base $f | trimSuffix ".alloy") (readFile $f) }}
+{{- end }}
+{{- $stages = mergeOverwrite $stages ($cfg | get "logStages" dict) }}
+
+{{- /* Компоненты конвейера */}}
+{{- $blocks := dict }}
+{{- range $f := readDir "blocks" }}
+{{- $_ := set $blocks (base $f | trimSuffix ".alloy") (readFile $f) }}
+{{- end }}
+{{- if not ($features | get "tracing" false) }}{{ $_ := unset $blocks "40-otlp-traces" }}{{ end }}
+{{- if not ($features | get "profiling" false) }}{{ $_ := unset $blocks "50-pprof" }}{{ end }}
+
+{{- $process := list "// ---------- Разбор логов: единые метки level/format/env, message и params — structured metadata ----------" "loki.process \"pod_logs\" {" "  forward_to = [loki.write.default.receiver]" "" }}
+{{- range $name, $text := $stages }}{{ if $text }}
+{{- $process = append $process (indent 2 (trim $text)) }}
+{{- $process = append $process "" }}
+{{- end }}{{ end }}
+{{- $process = append $process "}" }}
+{{- $_ := set $blocks "20-logs-process" (join "\n" $process) }}
+{{- $blocks = mergeOverwrite $blocks ($cfg | get "blocks" dict) }}
+
+alloy:
+  configMap:
+    content: |
+{{- range $name, $text := $blocks }}{{ if $text }}
+{{ trim $text | indent 6 }}
+
+{{- end }}{{ end }}
+
+  # Логи подов читаются с узла
+  mounts:
+    varlog: true
+
+{{- if ($features | get "tracing" false) }}
+  # Приём OTLP от сервисов: alloy.alloy.svc.cluster.local:4317 (gRPC) / :4318 (HTTP)
+  extraPorts:
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+      protocol: TCP
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+      protocol: TCP
+{{- end }}
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+controller:
+  type: daemonset

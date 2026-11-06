@@ -1,0 +1,8 @@
+// Приводим level к единому набору: info
+stage.match {
+  selector = `{level=~"(?i)i|info|log|notice|[123]\\d\\d"}`
+
+  stage.static_labels {
+    values = { level = "info" }
+  }
+}

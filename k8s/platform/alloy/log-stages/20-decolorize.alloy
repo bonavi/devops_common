@@ -1,0 +1,2 @@
+// Убираем ANSI-цвета (Home Assistant, Music Assistant)
+stage.decolorize { }

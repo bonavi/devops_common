@@ -1,0 +1,8 @@
+// Приводим level к единому набору: debug
+stage.match {
+  selector = `{level=~"(?i)d|debug|trace"}`
+
+  stage.static_labels {
+    values = { level = "debug" }
+  }
+}

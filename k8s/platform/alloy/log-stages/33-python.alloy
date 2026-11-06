@@ -1,0 +1,11 @@
+// Python: 2026-11-05 12:56:52.502 WARNING (MainThread) [logger] ... (Home Assistant, Music Assistant)
+stage.match {
+  selector = `{namespace=~".+"} |~ "^\\d{4}-\\d\\d-\\d\\d \\d\\d:\\d\\d:\\d\\d\\.\\d+ [A-Z]+ \\("`
+
+  stage.regex {
+    expression = `^\S+ \S+ (?P<level>[A-Z]+) \(\S+\) \[[^\]]+\] (?P<message>.*)$`
+  }
+  stage.static_labels {
+    values = { format = "python" }
+  }
+}

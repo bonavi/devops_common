@@ -29,11 +29,55 @@ grafana:
       password: $__env{GF_DATABASE_PASSWORD}
       ssl_mode: disable
 
+{{- $features := .Values.cluster | get "features" dict }}
+{{- $tracing := $features | get "tracing" false }}
+{{- $profiling := $features | get "profiling" false }}
   additionalDataSources:
     - name: Loki
       type: loki
       url: http://loki-headless.loki.svc.cluster.local:3100
       access: proxy
+{{- if or $tracing $profiling }}
+      # Постоянный UID — на него ссылаются переходы из Tempo. Только при трейсинге/профилировании:
+      # смена UID у существующего Loki сломала бы ссылки в уже сохранённых дашбордах
+      uid: loki
+{{- end }}
+{{- if $tracing }}
+    # Трейсы. Переходы: трейс → логи пода (по app и окну времени), → профиль, граф сервисов
+    - name: Tempo
+      type: tempo
+      uid: tempo
+      url: http://tempo.tempo.svc.cluster.local:3200
+      access: proxy
+      jsonData:
+        tracesToLogsV2:
+          datasourceUid: loki
+          spanStartTimeShift: -5m
+          spanEndTimeShift: 5m
+          tags:
+            - key: service.name
+              value: app
+        serviceMap:
+          datasourceUid: prometheus
+        nodeGraph:
+          enabled: true
+{{- if $profiling }}
+        tracesToProfiles:
+          datasourceUid: pyroscope
+          profileTypeId: "process_cpu:cpu:nanoseconds:cpu:nanoseconds"
+          tags:
+            - key: service.name
+              value: service_name
+{{- end }}
+{{- end }}
+{{- if $profiling }}
+    # Профили (CPU, память, горутины) из /debug/pprof сервисов
+    - name: Pyroscope
+      type: grafana-pyroscope-datasource
+      uid: pyroscope
+      url: http://pyroscope.pyroscope.svc.cluster.local:4040
+      access: proxy
+{{- end }}
 
   sidecar:
     dashboards:

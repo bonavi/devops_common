@@ -1,0 +1,11 @@
+// klog: I1105 09:56:47.440480  1 service.go:47] "..." (cert-manager, metrics-server)
+stage.match {
+  selector = `{namespace=~".+"} |~ "^[IWEF]\\d{4} "`
+
+  stage.regex {
+    expression = `^(?P<level>[IWEF])\d{4} \S+\s+\d+ \S+\] (?P<message>.*)$`
+  }
+  stage.static_labels {
+    values = { format = "klog" }
+  }
+}

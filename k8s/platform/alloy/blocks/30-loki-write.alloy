@@ -1,0 +1,7 @@
+loki.write "default" {
+  endpoint {
+    url = "http://loki-headless.loki.svc.cluster.local:3100/loki/api/v1/push"
+  }
+  // Пока рядом работает Promtail — отличаем потоки Alloy
+  external_labels = { collector = "alloy" }
+}

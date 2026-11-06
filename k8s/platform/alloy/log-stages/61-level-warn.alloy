@@ -1,0 +1,8 @@
+// Приводим level к единому набору: warn
+stage.match {
+  selector = `{level=~"(?i)w|warn|warning|4\\d\\d"}`
+
+  stage.static_labels {
+    values = { level = "warn" }
+  }
+}

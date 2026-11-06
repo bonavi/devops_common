@@ -34,6 +34,10 @@ additionalPrometheusRulesMap:
 
 prometheus:
   prometheusSpec:
+{{- if (.Values.cluster | get "features" dict | get "tracing" false) }}
+    # Приём remote_write: Tempo пишет метрики из трейсов (span-metrics, service-graphs)
+    enableRemoteWriteReceiver: true
+{{- end }}
     # Хранить метрики 14 дней
     retention: 14d
     # Жёсткий лимит на размер базы на диске — защита от неожиданного роста

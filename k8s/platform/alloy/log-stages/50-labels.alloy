@@ -1,0 +1,5 @@
+// level, env — метки; текст и параметры — structured metadata (в метках они создавали бы
+// новый поток на каждое значение)
+stage.labels {
+  values = { level = "", env = "" }
+}

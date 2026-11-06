@@ -1,0 +1,8 @@
+// Всё остальное: строка как есть
+stage.match {
+  selector = `{namespace=~".+", format=""}`
+
+  stage.static_labels {
+    values = { format = "raw" }
+  }
+}
