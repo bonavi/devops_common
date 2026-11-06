@@ -1,0 +1,8 @@
+# Устанавливаем CRD через helm чтобы не применять вручную через kubectl.
+# CRD включают такие ресурсы как PrometheusRule, ServiceMonitor, AlertmanagerConfig и др.
+crds:
+  enabled: true
+  # Helm не обновляет CRD при апгрейде чарта. Джоба-хук применяет CRD новой версии
+  # до деплоя operator'а (preview в чарте; при сбое — выключить и применить CRD руками)
+  upgradeJob:
+    enabled: true

@@ -1,9 +1,12 @@
 # Общая k8s-платформа. Подключается в helmfile проекта через
 #   bases: [../common/k8s/platform.yaml]
-# Здесь — что ставится (chart, точная версия, namespace) и базовая настройка.
-# Проект решает, какие компоненты развернуть (releases с inherit: template: <имя>),
-# и уточняет настройку в config/<имя>/values*.yaml.gotmpl (файлы необязательны).
-# Параметры кластера — .Values.cluster.* из cluster.yaml проекта.
+# Здесь — общие репозитории чартов, настройки helm и шаблоны релизов.
+# Проект решает, что развёрнуто: релиз с chart (version — по желанию, иначе последняя),
+# при необходимости namespace и needs, и inherit: template: platform | prod_dev | chart.
+# Настройка подключается сама по имени релиза:
+#   база    — common/k8s/platform/<релиз>/values.yaml.gotmpl (+ values-<env>.yaml.gotmpl)
+#   проект  — config/<релиз>/values.yaml.gotmpl (+ values-<env>.yaml.gotmpl)
+# Все файлы необязательны. Параметры кластера — .Values.cluster.* из cluster.yaml проекта.
 # Пути values считаются от каталога k8s/ проекта.
 
 repositories:
@@ -29,28 +32,32 @@ helmDefaults:
 
 templates:
 
-  # ---------- Шаблоны для сервисов проекта ----------
-
-  # Сервисы с окружениями (prod/dev) — namespace включает имя окружения
-  prod_dev:
-    namespace: "{{ .Release.Name }}-{{ .Environment.Name }}"
+  # Релиз в одном экземпляре на кластер (компоненты платформы и сервисы-синглтоны):
+  # namespace = имя релиза, база из common (если есть) + настройка проекта
+  platform:
+    namespace: "{{ .Release.Name }}"
     createNamespace: true
-    missingFileHandler: Warn
+    missingFileHandler: Info
+    labels:
+      env: prod
     values:
+      - "../common/k8s/platform/{{ .Release.Name }}/values.yaml.gotmpl"
+      - "../common/k8s/platform/{{ .Release.Name }}/values-{{ .Environment.Name }}.yaml.gotmpl"
       - "config/{{ .Release.Name }}/values.yaml.gotmpl"
       - "config/{{ .Release.Name }}/values-{{ .Environment.Name }}.yaml.gotmpl"
 
-  # Сервисы в одном экземпляре — namespace фиксированный, без суффикса окружения
-  singleton:
-    namespace: "{{ .Release.Name }}"
+  # Релиз на каждое окружение (prod/dev): namespace = <релиз>-<окружение>, настройка как у platform
+  prod_dev:
+    namespace: "{{ .Release.Name }}-{{ .Environment.Name }}"
     createNamespace: true
-    missingFileHandler: Warn
+    missingFileHandler: Info
     values:
+      - "../common/k8s/platform/{{ .Release.Name }}/values.yaml.gotmpl"
+      - "../common/k8s/platform/{{ .Release.Name }}/values-{{ .Environment.Name }}.yaml.gotmpl"
       - "config/{{ .Release.Name }}/values.yaml.gotmpl"
-    labels:
-      env: prod
+      - "config/{{ .Release.Name }}/values-{{ .Environment.Name }}.yaml.gotmpl"
 
-  # Локальные чарты (go-server, envoy и др.) — namespace = окружение
+  # Сервис проекта на чарте app (go-server, envoy и др.): namespace = окружение
   chart:
     namespace: "{{ .Environment.Name }}"
     createNamespace: true
@@ -58,154 +65,3 @@ templates:
     values:
       - "config/{{ .Release.Name }}/values.yaml.gotmpl"
       - "config/{{ .Release.Name }}/values-{{ .Environment.Name }}.yaml.gotmpl"
-
-  # ---------- Компоненты платформы ----------
-  # values: сначала база из common, затем необязательные файлы проекта
-
-  cluster-users:
-    chart: incubator/raw
-    version: 0.2.5
-    namespace: default
-    createNamespace: true
-    missingFileHandler: Info
-    labels: { env: prod }
-    values:
-      - ../common/k8s/platform/cluster-users/values.yaml.gotmpl
-      - config/cluster-users/values.yaml.gotmpl
-
-  ingress-nginx:
-    chart: ingress-nginx/ingress-nginx
-    version: 4.15.1
-    namespace: ingress-nginx
-    createNamespace: true
-    missingFileHandler: Info
-    labels: { env: prod }
-    values:
-      - ../common/k8s/platform/ingress-nginx/values.yaml.gotmpl
-      - config/ingress-nginx/values.yaml.gotmpl
-
-  cert-manager:
-    chart: jetstack/cert-manager
-    version: v1.21.3
-    namespace: cert-manager
-    createNamespace: true
-    missingFileHandler: Info
-    labels: { env: prod }
-    values:
-      - ../common/k8s/platform/cert-manager/values.yaml.gotmpl
-      - config/cert-manager/values.yaml.gotmpl
-
-  # ClusterIssuer letsencrypt (HTTP-01 через ingress nginx)
-  letsencrypt-issuer:
-    chart: incubator/raw
-    version: 0.2.5
-    namespace: cert-manager
-    createNamespace: true
-    disableValidationOnInstall: true
-    needs: [cert-manager/cert-manager]
-    missingFileHandler: Info
-    labels: { env: prod }
-    values:
-      - ../common/k8s/platform/letsencrypt-issuer/values.yaml.gotmpl
-      - config/letsencrypt-issuer/values.yaml.gotmpl
-
-  # Реестр образов: секрет registry-credentials в namespace окружения
-  registry-credentials:
-    chart: incubator/raw
-    version: 0.2.5
-    namespace: "{{ .Environment.Name }}"
-    createNamespace: true
-    missingFileHandler: Info
-    values:
-      - ../common/k8s/platform/registry-credentials/values.yaml.gotmpl
-      - config/registry-credentials/values.yaml.gotmpl
-
-  loki:
-    chart: grafana/loki
-    version: 7.5.0
-    namespace: loki
-    createNamespace: true
-    missingFileHandler: Info
-    labels: { env: prod }
-    values:
-      - ../common/k8s/platform/loki/values.yaml.gotmpl
-      - config/loki/values.yaml.gotmpl
-
-  promtail:
-    chart: grafana/promtail
-    version: 6.17.1
-    namespace: promtail
-    createNamespace: true
-    needs: [loki/loki]
-    missingFileHandler: Info
-    labels: { env: prod }
-    values:
-      - ../common/k8s/platform/promtail/values.yaml.gotmpl
-      - config/promtail/values.yaml.gotmpl
-
-  # kube-prometheus-stack: Prometheus, Alertmanager, Grafana (состояние в postgres-<env>)
-  monitoring:
-    chart: prometheus-community/kube-prometheus-stack
-    version: 92.17.1
-    namespace: monitoring
-    createNamespace: true
-    disableValidationOnInstall: true
-    missingFileHandler: Info
-    labels: { env: prod }
-    values:
-      - ../common/k8s/platform/monitoring/values.yaml.gotmpl
-      - ../common/k8s/platform/monitoring/values-alertmanager.yaml.gotmpl
-      - ../common/k8s/platform/monitoring/values-grafana.yaml.gotmpl
-      - ../common/k8s/platform/monitoring/values-prometheus.yaml.gotmpl
-      - ../common/k8s/platform/monitoring/values-alerts.yaml.gotmpl
-      - config/monitoring/values.yaml.gotmpl
-      - config/monitoring/values-alertmanager.yaml.gotmpl
-      - config/monitoring/values-grafana.yaml.gotmpl
-      - config/monitoring/values-prometheus.yaml.gotmpl
-      - config/monitoring/values-alerts.yaml.gotmpl
-
-  prometheus-blackbox:
-    chart: prometheus-community/prometheus-blackbox-exporter
-    version: 11.20.2
-    namespace: monitoring
-    needs: [monitoring/monitoring]
-    missingFileHandler: Info
-    labels: { env: prod }
-    values:
-      - ../common/k8s/platform/monitoring/values-blackbox.yaml.gotmpl
-      - config/monitoring/values-blackbox.yaml.gotmpl
-
-  # Базовые дашборды Grafana (ConfigMap с меткой grafana_dashboard=1)
-  grafana-dashboards:
-    chart: incubator/raw
-    version: 0.2.5
-    namespace: monitoring
-    needs: [monitoring/monitoring]
-    missingFileHandler: Info
-    labels: { env: prod }
-    values:
-      - ../common/k8s/platform/monitoring/dashboards/dashboards-values.yaml.gotmpl
-
-  postgres:
-    chart: bitnami/postgresql
-    version: 18.3.0
-    namespace: "postgres-{{ .Environment.Name }}"
-    createNamespace: true
-    missingFileHandler: Info
-    values:
-      - ../common/k8s/platform/postgres/values.yaml.gotmpl
-      - "../common/k8s/platform/postgres/values-{{ .Environment.Name }}.yaml.gotmpl"
-      - config/postgres/values.yaml.gotmpl
-      - "config/postgres/values-{{ .Environment.Name }}.yaml.gotmpl"
-
-  # Пользователи и базы в postgres-<env>
-  postgres-init:
-    chart: incubator/raw
-    version: 0.2.5
-    namespace: "postgres-{{ .Environment.Name }}"
-    createNamespace: true
-    needs: ["postgres-{{ .Environment.Name }}/postgres"]
-    missingFileHandler: Info
-    values:
-      - ../common/k8s/platform/postgres/init-secret.yaml.gotmpl
-      - config/postgres/init-secret.yaml.gotmpl

@@ -1,4 +1,8 @@
-# Устанавливаем CRD через helm чтобы не применять вручную через kubectl.
-# CRD включают такие ресурсы как PrometheusRule, ServiceMonitor, AlertmanagerConfig и др.
-crds:
-  enabled: true
+# kube-prometheus-stack: Prometheus, Alertmanager, Grafana.
+# Настройка разбита на части parts/*.yaml.gotmpl; здесь они сливаются вглубь (словари — по ключам,
+# списки — последняя часть побеждает) в один values. Пути частей — от этого файла.
+{{- $v := dict }}
+{{- range list "general" "alertmanager" "grafana" "prometheus" "alerts" }}
+{{- $v = mergeOverwrite $v (tpl (readFile (printf "parts/%s.yaml.gotmpl" .)) $ | fromYaml) }}
+{{- end }}
+{{ toYaml $v }}
