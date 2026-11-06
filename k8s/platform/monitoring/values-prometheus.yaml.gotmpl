@@ -48,22 +48,79 @@ prometheus:
             requests:
               storage: 20Gi
 
-    # Все дополнительные таргеты для скрейпа, не покрытые ServiceMonitor'ами.
+    # Дополнительные таргеты, не покрытые ServiceMonitor'ами.
+    # Собираются из именованных словарей — проект дополняет их в config/monitoring/cluster-values.yaml:
+    #   monitoring.scrapeJobs.<имя>: {...job...}   — добавить/заменить job, null — убрать базовый
+    #   monitoring.blackboxTargets.<имя>: <url>    — цели blackbox, null — убрать базовую
     additionalScrapeConfigs:
-      # Blackbox — проверка доступности HTTP эндпоинтов снаружи
-    - job_name: 'blackbox'
-      metrics_path: /probe
-      params:
-        module:
-        - http_2xx
-      # Relabeling: передаём target как параметр в blackbox, а запрос направляем на его svc
-      relabel_configs:
-      - source_labels: [__address__]
-        target_label: __param_target
-      - source_labels: [__param_target]
-        target_label: instance
-      - replacement: prometheus-blackbox-prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
-        target_label: __address__
-      static_configs:
-      - targets:
-        - https://grafana.{{ .Values.cluster.domain }}
+{{- $cfg := .Values | get "monitoring" dict }}
+
+{{- /* Цели blackbox: по умолчанию — своя Grafana */}}
+{{- $targets := dict "grafana" (printf "https://grafana.%s" .Values.cluster.domain) }}
+{{- $targets = mergeOverwrite $targets ($cfg | get "blackboxTargets" dict) }}
+{{- $urls := list }}
+{{- range $name, $url := $targets }}{{ if $url }}{{ $urls = append $urls $url }}{{ end }}{{ end }}
+
+{{- $jobs := dict }}
+
+{{- /* Автоматический discovery подов с аннотацией prometheus.io/scrape=true.
+       Сервис добавляет в pod template аннотации prometheus.io/{scrape,path,port}
+       и попадает в скрейп без правок этого файла. */}}
+{{- $_ := set $jobs "kubernetes-pods" (`
+job_name: kubernetes-pods
+honor_labels: false
+kubernetes_sd_configs:
+- role: pod
+scrape_interval: 60s
+relabel_configs:
+- source_labels: [__meta_kubernetes_pod_container_init]
+  action: drop
+  regex: true
+- source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+  action: keep
+  regex: true
+- source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+  action: replace
+  target_label: __metrics_path__
+  regex: (.+)
+- source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+  action: replace
+  regex: ([^:]+)(?::\d+)?;(\d+)
+  replacement: $1:$2
+  target_label: __address__
+- action: labelmap
+  regex: __meta_kubernetes_pod_label_(.+)
+- source_labels: [__meta_kubernetes_namespace]
+  action: replace
+  target_label: namespace
+- source_labels: [__meta_kubernetes_pod_name]
+  action: replace
+  target_label: pod
+metric_relabel_configs:
+- action: labeldrop
+  regex: pod_template_hash
+` | fromYaml) }}
+
+{{- /* Blackbox — проверка доступности HTTP эндпоинтов снаружи (только если есть цели) */}}
+{{- if $urls }}
+{{- $_ := set $jobs "blackbox" (`
+job_name: blackbox
+metrics_path: /probe
+params:
+  module: [http_2xx]
+# Передаём target как параметр в blackbox, а запрос направляем на его svc
+relabel_configs:
+- source_labels: [__address__]
+  target_label: __param_target
+- source_labels: [__param_target]
+  target_label: instance
+- replacement: prometheus-blackbox-prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
+  target_label: __address__
+` | fromYaml) }}
+{{- $_ := set (index $jobs "blackbox") "static_configs" (list (dict "targets" $urls)) }}
+{{- end }}
+
+{{- $jobs = mergeOverwrite $jobs ($cfg | get "scrapeJobs" dict) }}
+{{- range $name, $job := $jobs }}{{ if $job }}
+    - {{ toYaml $job | nindent 6 | trim }}
+{{- end }}{{ end }}
