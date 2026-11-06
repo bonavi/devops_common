@@ -18,6 +18,12 @@ discovery.relabel "pprof" {
     regex         = "true"
     action        = "keep"
   }
+  // Только с явным портом: чарты Grafana ставят свои аннотации с cpu.port_name — их не трогаем
+  rule {
+    source_labels = ["__meta_kubernetes_pod_annotation_profiles_grafana_com_cpu_port"]
+    regex         = "\\d+"
+    action        = "keep"
+  }
   rule {
     source_labels = ["__meta_kubernetes_pod_container_init"]
     regex         = "true"
