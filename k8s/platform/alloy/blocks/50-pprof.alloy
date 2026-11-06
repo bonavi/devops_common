@@ -86,6 +86,6 @@ pyroscope.scrape "pods" {
 
 pyroscope.write "default" {
   endpoint {
-    url = "http://pyroscope.pyroscope.svc.cluster.local:4040"
+    url = "{{ .Values.endpoints.pyroscope }}"
   }
 }

@@ -190,7 +190,7 @@ match:
 config:
   clients:
     # Адрес Loki куда Promtail отправляет логи
-    - url: http://loki-headless.loki.svc.cluster.local:3100/loki/api/v1/push
+    - url: {{ .Values.endpoints.loki }}/loki/api/v1/push
 
   snippets:
     pipelineStages:

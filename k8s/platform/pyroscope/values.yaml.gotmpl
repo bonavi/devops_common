@@ -1,6 +1,6 @@
 # Grafana Pyroscope (один экземпляр) — хранилище профилей.
 # Профили собирает Alloy (pull /debug/pprof по аннотациям profiles.grafana.com/*) и пишет
-# в pyroscope.pyroscope.svc.cluster.local:4040. Встроенный агент чарта не нужен.
+# в endpoints.pyroscope. Встроенный агент чарта не нужен.
 pyroscope:
   extraArgs:
     log.level: info

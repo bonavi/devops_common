@@ -35,7 +35,7 @@ grafana:
   additionalDataSources:
     - name: Loki
       type: loki
-      url: http://loki-headless.loki.svc.cluster.local:3100
+      url: {{ .Values.endpoints.loki }}
       access: proxy
 {{- if or $tracing $profiling }}
       # Постоянный UID — на него ссылаются переходы из Tempo. Только при трейсинге/профилировании:
@@ -58,7 +58,7 @@ grafana:
     - name: Tempo
       type: tempo
       uid: tempo
-      url: http://tempo.tempo.svc.cluster.local:3200
+      url: {{ .Values.endpoints.tempo.url }}
       access: proxy
       jsonData:
         tracesToLogsV2:
@@ -90,7 +90,7 @@ grafana:
     - name: Pyroscope
       type: grafana-pyroscope-datasource
       uid: pyroscope
-      url: http://pyroscope.pyroscope.svc.cluster.local:4040
+      url: {{ .Values.endpoints.pyroscope }}
       access: proxy
 {{- end }}
 

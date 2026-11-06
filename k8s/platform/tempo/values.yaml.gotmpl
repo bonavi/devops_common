@@ -1,5 +1,5 @@
 # Grafana Tempo (одиночный бинарник, чарт grafana-community/tempo) — хранилище трейсов.
-# Трейсы приходят от Alloy по OTLP gRPC (tempo.tempo.svc.cluster.local:4317).
+# Трейсы приходят от Alloy по OTLP gRPC (endpoints.tempo.otlpGrpc).
 tempo:
   reportingEnabled: false
   # Хранить трейсы 3 дня — как логи в Loki, чтобы переход лог ↔ трейс работал всё окно
@@ -19,7 +19,7 @@ tempo:
   #   service-graphs — кто кого вызывает, для графа сервисов в Grafana
   metricsGenerator:
     enabled: true
-    remoteWriteUrl: "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+    remoteWriteUrl: "{{ .Values.endpoints.prometheus }}/api/v1/write"
   overrides:
     defaults:
       metrics_generator:

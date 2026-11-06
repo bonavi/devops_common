@@ -3,7 +3,7 @@
 #
 # Конфиг собирается из файлов рядом (пути — от этого файла):
 #   log-stages/NN-имя.alloy — стадии разбора логов (порядок — по NN)
-#   blocks/NN-имя.alloy     — компоненты конвейера
+#   blocks/NN-имя.alloy     — компоненты конвейера (шаблоны: адреса из .Values.endpoints, см. ../endpoints.yaml)
 # Проект дополняет их в config/alloy/cluster-values.yaml (values окружения):
 #   alloy.logStages.<NN-имя>: |  ...текст стадии...   — добавить/заменить, null — убрать базовую
 #   alloy.blocks.<NN-имя>: |  ...текст блока...        — то же для компонентов
@@ -21,8 +21,9 @@
 
 {{- /* Компоненты конвейера */}}
 {{- $blocks := dict }}
+{{- /* Блоки — шаблоны: адреса сервисов подставляются из .Values.endpoints */}}
 {{- range $f := readDir "blocks" }}
-{{- $_ := set $blocks (base $f | trimSuffix ".alloy") (readFile $f) }}
+{{- $_ := set $blocks (base $f | trimSuffix ".alloy") (tpl (readFile $f) $) }}
 {{- end }}
 {{- if not ($features | get "tracing" false) }}{{ $_ := unset $blocks "40-otlp-traces" }}{{ end }}
 {{- if not ($features | get "profiling" false) }}{{ $_ := unset $blocks "50-pprof" }}{{ end }}
@@ -49,7 +50,7 @@ alloy:
     varlog: true
 
 {{- if ($features | get "tracing" false) }}
-  # Приём OTLP от сервисов: alloy.alloy.svc.cluster.local:4317 (gRPC) / :4318 (HTTP)
+  # Приём OTLP от сервисов: endpoints.alloy.otlpGrpc / otlpHttp
   extraPorts:
     - name: otlp-grpc
       port: 4317
@@ -70,3 +71,21 @@ alloy:
 
 controller:
   type: daemonset
+
+{{- with .Values.endpoints.alloy.uiHost }}
+# Веб-интерфейс Alloy по адресу endpoints.alloy.uiHost. Ingress чарта задуман для Faro,
+# но порт берётся из faroPort — направляем его на HTTP-сервер Alloy (12345), где и живёт UI.
+# Авторизации у UI нет: включать только для домена локальной сети (сертификат — свой CA)
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  faroPort: 12345
+  annotations:
+    cert-manager.io/cluster-issuer: selfsigned-home
+  hosts:
+    - {{ . }}
+  tls:
+    - secretName: alloy-ui-tls
+      hosts:
+        - {{ . }}
+{{- end }}

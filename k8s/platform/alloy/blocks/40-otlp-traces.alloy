@@ -30,7 +30,7 @@ otelcol.processor.batch "default" {
 
 otelcol.exporter.otlp "tempo" {
   client {
-    endpoint = "tempo.tempo.svc.cluster.local:4317"
+    endpoint = "{{ .Values.endpoints.tempo.otlpGrpc }}"
     tls {
       insecure = true
     }
