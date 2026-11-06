@@ -179,3 +179,42 @@ git commit -m "update common"
 обновите pointer submodule в проекте (`git add common && git commit`) и,
 если правка нужна и в других devops-проектах, обновите там `common` тем же
 способом.
+
+## Платформа k8s (`k8s/platform.yaml`)
+
+Общие компоненты кластера: что ставится (chart, точная версия, namespace) и базовая настройка.
+
+Подключение в `k8s/helmfile.yaml` проекта:
+
+```yaml
+bases:
+  - ../common/k8s/platform.yaml
+---
+environments:
+  prod:
+    values: [cluster.yaml]
+    secrets: ["secrets/secrets-prod.yaml"]
+---
+helmDefaults:
+  kubeContext: <контекст>
+releases:
+  - name: loki
+    inherit: [{template: loki}]
+```
+
+- **Что развёрнуто** — решает список `releases` проекта.
+- **Базовая настройка** — `common/k8s/platform/<компонент>/` (наибольшее общее для всех кластеров).
+- **Точечная настройка** — необязательные `config/<компонент>/values*.yaml.gotmpl` проекта, накладываются поверх базы (списки заменяются целиком).
+- **Параметры кластера** — `k8s/cluster.yaml` проекта → `.Values.cluster.{clusterName,domain,acmeEmail}`.
+- Компоненты: `cluster-users`, `ingress-nginx`, `cert-manager`, `letsencrypt-issuer`, `registry-credentials`, `loki`, `promtail`, `monitoring`, `prometheus-blackbox`, `grafana-dashboards`, `postgres`, `postgres-init`. Для сервисов проекта — шаблоны `prod_dev`, `singleton`, `chart`.
+- Обновление версии чарта — коммит сюда, затем подъём сабмодуля в проектах и пустой/ожидаемый `helmfile diff`.
+
+### Обязательные ключи в `secrets/secrets-<env>.yaml` (SOPS)
+
+| Ключ | Кто читает |
+|---|---|
+| `cluster_users` | cluster-users |
+| `image_credentials.{registry,username,password}` | registry-credentials |
+| `pgsql.users.postgres.password`, `pgsql.users.grafana.password` | postgres, postgres-init, monitoring (Grafana) |
+| `grafana.adminPassword` | monitoring |
+| `alertmanager.{telegram_token,telegram_chat_id,telegram_topic_id}` | monitoring (Alertmanager) |

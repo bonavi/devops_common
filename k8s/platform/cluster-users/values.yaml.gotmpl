@@ -1,0 +1,119 @@
+resources:
+
+  # ClusterRole — readonly на все основные ресурсы, без secrets
+  # pods/exec и pods/portforward разрешены для отладки
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      name: cluster-read-all
+    rules:
+      - apiGroups:
+          - ""
+          - apps
+          - autoscaling
+          - batch
+          - extensions
+          - policy
+          - rbac.authorization.k8s.io
+          - storage.k8s.io
+          - metrics.k8s.io
+        resources:
+          - componentstatuses
+          - configmaps
+          - cronjobs
+          - daemonsets
+          - deployments
+          - events
+          - endpoints
+          - horizontalpodautoscalers
+          - ingress
+          - ingresses
+          - jobs
+          - limitranges
+          - namespaces
+          - nodes
+          - pods
+          - pods/log
+          - pods/exec
+          - persistentvolumes
+          - persistentvolumeclaims
+          - resourcequotas
+          - replicasets
+          - replicationcontrollers
+          - serviceaccounts
+          - services
+          - statefulsets
+          - storageclasses
+          - clusterroles
+          - roles
+        verbs: ["get", "watch", "list"]
+      - nonResourceURLs: ["*"]
+        verbs: ["get", "watch", "list"]
+      - apiGroups: [""]
+        resources: ["pods/exec"]
+        verbs: ["create"]
+
+  # ClusterRole — минимальные права для бэкап-бота:
+  # найти под за сервисом + сделать port-forward. Ничего больше.
+  # Биндим этот ClusterRole через RoleBinding в один namespace.
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      name: backuper
+    rules:
+      - apiGroups: [""]
+        resources: ["services", "pods"]
+        verbs: ["get", "list"]
+      - apiGroups: [""]
+        resources: ["pods/portforward"]
+        verbs: ["create"]
+
+{{ range .Values.cluster_users }}
+  - apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      name: {{ .name }}
+      namespace: default
+
+  {{- if hasKey . "namespaces" }}
+  # Доступ ограничен перечисленными namespace — RoleBinding в каждом из них.
+  {{- $user := . }}
+  {{- range $ns := .namespaces }}
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    metadata:
+      name: {{ $user.name }}
+      namespace: {{ $ns }}
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: {{ $user.role }}
+    subjects:
+      - kind: ServiceAccount
+        name: {{ $user.name }}
+        namespace: default
+  {{- end }}
+  {{- else }}
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    metadata:
+      name: {{ .name }}
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: {{ .role }}
+    subjects:
+      - kind: ServiceAccount
+        name: {{ .name }}
+        namespace: default
+  {{- end }}
+
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: {{ .name }}-token
+      namespace: default
+      annotations:
+        kubernetes.io/service-account.name: {{ .name }}
+    type: kubernetes.io/service-account-token
+{{ end }}
