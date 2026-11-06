@@ -43,6 +43,17 @@ grafana:
       uid: loki
 {{- end }}
 {{- if $tracing }}
+      # Лог → трейс: traceID из structured metadata (его извлекает Alloy из JSON-логов)
+      jsonData:
+        derivedFields:
+          - name: traceID
+            matcherType: label
+            matcherRegex: traceID
+            datasourceUid: tempo
+            url: "${__value.raw}"
+            urlDisplayLabel: Трейс
+{{- end }}
+{{- if $tracing }}
     # Трейсы. Переходы: трейс → логи и профиль того же пода (атрибуты k8s.* добавляет Alloy), граф сервисов
     - name: Tempo
       type: tempo

@@ -1,4 +1,4 @@
-// JSON: {"level":"warn","message":"...","params":{...}}
+// JSON: {"level":"warn","message":"...","params":{...},"traceID":"..."}
 stage.match {
   selector = `{namespace=~".+"} |~ "^\\{"`
 
@@ -8,6 +8,7 @@ stage.match {
       message    = "message || msg",
       systemInfo = "systemInfo",
       params     = "params",
+      traceID    = "traceID",
     }
   }
   stage.json {

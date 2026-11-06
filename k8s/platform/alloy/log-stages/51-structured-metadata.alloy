@@ -1,3 +1,4 @@
+// Текст, параметры и traceID — structured metadata: по traceID Grafana переходит из лога в трейс
 stage.structured_metadata {
-  values = { message = "", params = "" }
+  values = { message = "", params = "", traceID = "" }
 }
