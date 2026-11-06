@@ -32,6 +32,14 @@ grafana:
 {{- $features := .Values.cluster | get "features" dict }}
 {{- $tracing := $features | get "tracing" false }}
 {{- $profiling := $features | get "profiling" false }}
+{{- if or $tracing $profiling }}
+  # Loki получает постоянный UID (uid: loki). Grafana не умеет менять UID у уже созданного
+  # datasource («data source not found» при reload) — пересоздаём его на каждом provisioning.
+  # Безопасно: Loki целиком описан здесь, ссылки идут по постоянному UID
+  deleteDatasources:
+    - name: Loki
+      orgId: 1
+{{- end }}
   additionalDataSources:
     - name: Loki
       type: loki
