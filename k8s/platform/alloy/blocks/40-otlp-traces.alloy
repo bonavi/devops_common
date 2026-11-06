@@ -1,0 +1,38 @@
+// ---------- Трейсы: OTLP (gRPC 4317, HTTP 4318) → Tempo ----------
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+  output {
+    traces = [otelcol.processor.k8sattributes.default.input]
+  }
+}
+
+// k8s.namespace.name и k8s.pod.name по IP пода-отправителя: по ним Grafana переходит
+// из трейса в логи (Loki: namespace, pod) и профили (Pyroscope: namespace, pod)
+otelcol.processor.k8sattributes "default" {
+  extract {
+    metadata = ["k8s.namespace.name", "k8s.pod.name"]
+  }
+  output {
+    traces = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  output {
+    traces = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "{{ .Values.endpoints.tempo.otlpGrpc }}"
+    tls {
+      insecure = true
+    }
+  }
+}

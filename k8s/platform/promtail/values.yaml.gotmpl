@@ -1,0 +1,204 @@
+# Promtail — сбор логов подов в Loki.
+# Единый набор полей для всех сервисов:
+#   метки: level (error|warn|info|debug|unknown), format (json|logfmt|klog|python|postgres|telegraf|bracket|access|raw), env
+#   structured metadata: message, params
+# Формат определяется по виду строки, а не по имени сервиса.
+#
+# Стадии и relabel — именованные словари, проект дополняет их в config/promtail/cluster-values.yaml:
+#   promtail.pipelineStages.<NN-имя>: {...стадия...}  — добавить/заменить, null — убрать базовую
+#   promtail.relabelConfigs.<имя>: {...}               — например, сузить сбор до части namespace
+# Порядок стадий — по ключу (NN), поэтому ключи нумерованы.
+{{- $cfg := .Values | get "promtail" dict }}
+{{- $stages := dict }}
+
+{{- /* Формат CRI — стандартная обёртка логов k8s */}}
+{{- $_ := set $stages "10-cri" (`
+cri: {}
+` | fromYaml) }}
+
+{{- /* Убираем ANSI-цвета (Home Assistant, Music Assistant) */}}
+{{- $_ := set $stages "20-decolorize" (`
+decolorize: {}
+` | fromYaml) }}
+
+{{- /* JSON: {"level":"warn","message":"...","params":{...}} */}}
+{{- $_ := set $stages "30-json" (`
+match:
+  selector: '{namespace=~".+"} |~ "^\\{"'
+  stages:
+    - json:
+        expressions:
+          level: level || severity
+          message: message || msg
+          systemInfo: systemInfo
+          params: params
+    - json:
+        expressions:
+          env: env
+        source: systemInfo
+    - static_labels:
+        format: json
+` | fromYaml) }}
+
+{{- /* logfmt: level=info msg="..." (loki, grafana, prometheus, promtail) */}}
+{{- $_ := set $stages "31-logfmt" (`
+match:
+  selector: '{namespace=~".+"} !~ "^\\{" |~ "(^|\\s)level=\\w+"'
+  stages:
+    - logfmt:
+        mapping:
+          level:
+          message: msg
+    - static_labels:
+        format: logfmt
+` | fromYaml) }}
+
+{{- /* klog: I1105 09:56:47.440480  1 service.go:47] "..." (cert-manager, metrics-server) */}}
+{{- $_ := set $stages "32-klog" (`
+match:
+  selector: '{namespace=~".+"} |~ "^[IWEF]\\d{4} "'
+  stages:
+    - regex:
+        expression: '^(?P<level>[IWEF])\d{4} \S+\s+\d+ \S+\] (?P<message>.*)$'
+    - static_labels:
+        format: klog
+` | fromYaml) }}
+
+{{- /* Python: 2026-11-05 12:56:52.502 WARNING (MainThread) [logger] ... (Home Assistant, Music Assistant) */}}
+{{- $_ := set $stages "33-python" (`
+match:
+  selector: '{namespace=~".+"} |~ "^\\d{4}-\\d\\d-\\d\\d \\d\\d:\\d\\d:\\d\\d\\.\\d+ [A-Z]+ \\("'
+  stages:
+    - regex:
+        expression: '^\S+ \S+ (?P<level>[A-Z]+) \(\S+\) \[[^\]]+\] (?P<message>.*)$'
+    - static_labels:
+        format: python
+` | fromYaml) }}
+
+{{- /* PostgreSQL: 2026-11-05 09:55:13.407 GMT [92] LOG:  ... */}}
+{{- $_ := set $stages "34-postgres" (`
+match:
+  selector: '{namespace=~".+"} |~ "^\\d{4}-\\d\\d-\\d\\d \\d\\d:\\d\\d:\\d\\d\\.\\d+ \\S+ \\[\\d+\\] [A-Z]+:"'
+  stages:
+    - regex:
+        expression: '^\S+ \S+ \S+ \[\d+\] (?P<level>[A-Z]+):\s+(?P<message>.*)$'
+    - static_labels:
+        format: postgres
+` | fromYaml) }}
+
+{{- /* Telegraf: 2026-11-04T20:02:04Z E! [plugin] ... */}}
+{{- $_ := set $stages "35-telegraf" (`
+match:
+  selector: '{namespace=~".+"} |~ "^\\S+Z [DIWE]! "'
+  stages:
+    - regex:
+        expression: '^\S+Z (?P<level>[DIWE])! (?P<message>.*)$'
+    - static_labels:
+        format: telegraf
+` | fromYaml) }}
+
+{{- /* CoreDNS: [WARNING] ... */}}
+{{- $_ := set $stages "36-bracket" (`
+match:
+  selector: '{namespace=~".+"} |~ "^\\[[A-Z]+\\] "'
+  stages:
+    - regex:
+        expression: '^\[(?P<level>[A-Z]+)\] (?P<message>.*)$'
+    - static_labels:
+        format: bracket
+` | fromYaml) }}
+
+{{- /* Access-логи nginx: уровень выводится из HTTP-статуса */}}
+{{- $_ := set $stages "37-access" (`
+match:
+  selector: '{namespace=~".+"} |~ "^\\S+ - \\S+ \\[[^\\]]+\\]\\s+(\"[^\"]*\" )?\\d{3} "'
+  stages:
+    - regex:
+        expression: '^\S+ - \S+ \[[^\]]+\]\s+(?:"[^"]*" )?(?P<level>\d{3}) '
+    - static_labels:
+        format: access
+` | fromYaml) }}
+
+{{- /* Всё остальное: строка как есть */}}
+{{- $_ := set $stages "39-raw" (`
+match:
+  selector: '{namespace=~".+", format=""}'
+  stages:
+    - static_labels:
+        format: raw
+` | fromYaml) }}
+
+{{- /* level, env — метки; текст и параметры — structured metadata, */}}
+{{- /* в метках они создавали бы новый поток на каждое значение */}}
+{{- $_ := set $stages "50-labels" (`
+labels:
+  level:
+  env:
+` | fromYaml) }}
+
+{{- $_ := set $stages "51-structured-metadata" (`
+structured_metadata:
+  message:
+  params:
+` | fromYaml) }}
+
+{{- /* Приводим level к единому набору значений */}}
+{{- $_ := set $stages "60-level-error" (`
+match:
+  selector: '{level=~"(?i)e|f|err|error|crit|critical|fatal|panic|alert|emerg|5\\d\\d"}'
+  stages:
+    - static_labels:
+        level: error
+` | fromYaml) }}
+
+{{- $_ := set $stages "61-level-warn" (`
+match:
+  selector: '{level=~"(?i)w|warn|warning|4\\d\\d"}'
+  stages:
+    - static_labels:
+        level: warn
+` | fromYaml) }}
+
+{{- $_ := set $stages "62-level-info" (`
+match:
+  selector: '{level=~"(?i)i|info|log|notice|[123]\\d\\d"}'
+  stages:
+    - static_labels:
+        level: info
+` | fromYaml) }}
+
+{{- $_ := set $stages "63-level-debug" (`
+match:
+  selector: '{level=~"(?i)d|debug|trace"}'
+  stages:
+    - static_labels:
+        level: debug
+` | fromYaml) }}
+
+{{- $_ := set $stages "69-level-unknown" (`
+match:
+  selector: '{namespace=~".+", level!~"error|warn|info|debug"}'
+  stages:
+    - static_labels:
+        level: unknown
+` | fromYaml) }}
+{{- $stages = mergeOverwrite $stages ($cfg | get "pipelineStages" dict) }}
+
+{{- /* По умолчанию — логи всех namespace */}}
+{{- $relabel := mergeOverwrite dict ($cfg | get "relabelConfigs" dict) }}
+
+config:
+  clients:
+    # Адрес Loki куда Promtail отправляет логи
+    - url: {{ .Values.endpoints.loki }}/loki/api/v1/push
+
+  snippets:
+    pipelineStages:
+{{- range $name, $stage := $stages }}{{ if $stage }}
+      - {{ toYaml $stage | nindent 8 | trim }}
+{{- end }}{{ end }}
+
+    extraRelabelConfigs:
+{{- range $name, $r := $relabel }}{{ if $r }}
+      - {{ toYaml $r | nindent 8 | trim }}
+{{- end }}{{ else }} []{{ end }}

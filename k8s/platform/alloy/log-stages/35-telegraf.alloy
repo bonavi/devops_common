@@ -1,0 +1,11 @@
+// Telegraf: 2026-11-04T20:02:04Z E! [plugin] ...
+stage.match {
+  selector = `{namespace=~".+"} |~ "^\\S+Z [DIWE]! "`
+
+  stage.regex {
+    expression = `^\S+Z (?P<level>[DIWE])! (?P<message>.*)$`
+  }
+  stage.static_labels {
+    values = { format = "telegraf" }
+  }
+}

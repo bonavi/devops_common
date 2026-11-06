@@ -1,0 +1,70 @@
+# Общая k8s-платформа. Подключается в helmfile проекта через
+#   bases: [../common/k8s/platform.yaml]
+# Здесь — общие репозитории чартов, настройки helm и шаблоны релизов.
+# Проект решает, что развёрнуто: релиз с chart (version — по желанию, иначе последняя),
+# при необходимости namespace и needs, и inherit: template: platform | prod_dev | chart.
+# Настройка подключается сама по имени релиза:
+#   база    — common/k8s/platform/<релиз>/values.yaml.gotmpl (+ values-<env>.yaml.gotmpl)
+#   проект  — config/<релиз>/values.yaml.gotmpl (+ values-<env>.yaml.gotmpl)
+# Все файлы необязательны. Параметры кластера — .Values.cluster.* из cluster.yaml проекта.
+# Пути values считаются от каталога k8s/ проекта.
+
+repositories:
+  - name: ingress-nginx
+    url: https://kubernetes.github.io/ingress-nginx
+  - name: jetstack
+    url: https://charts.jetstack.io
+  - name: incubator
+    url: https://charts.helm.sh/incubator
+  - name: prometheus-community
+    url: https://prometheus-community.github.io/helm-charts
+  - name: grafana
+    url: https://grafana.github.io/helm-charts
+  # Чарты, переданные Grafana сообществу (одиночный Tempo)
+  - name: grafana-community
+    url: https://grafana-community.github.io/helm-charts
+  - name: hashicorp
+    url: https://helm.releases.hashicorp.com
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami
+
+helmDefaults:
+  # При падении деплоя автоматически откатывает к предыдущей версии —
+  # релиз не застрянет в состоянии failed
+  atomic: true
+
+templates:
+
+  # Релиз в одном экземпляре на кластер (компоненты платформы и сервисы-синглтоны):
+  # namespace = имя релиза, база из common (если есть) + настройка проекта
+  platform:
+    namespace: "{{ .Release.Name }}"
+    createNamespace: true
+    missingFileHandler: Info
+    labels:
+      env: prod
+    values:
+      - "../common/k8s/platform/{{ .Release.Name }}/values.yaml.gotmpl"
+      - "../common/k8s/platform/{{ .Release.Name }}/values-{{ .Environment.Name }}.yaml.gotmpl"
+      - "config/{{ .Release.Name }}/values.yaml.gotmpl"
+      - "config/{{ .Release.Name }}/values-{{ .Environment.Name }}.yaml.gotmpl"
+
+  # Релиз на каждое окружение (prod/dev): namespace = <релиз>-<окружение>, настройка как у platform
+  prod_dev:
+    namespace: "{{ .Release.Name }}-{{ .Environment.Name }}"
+    createNamespace: true
+    missingFileHandler: Info
+    values:
+      - "../common/k8s/platform/{{ .Release.Name }}/values.yaml.gotmpl"
+      - "../common/k8s/platform/{{ .Release.Name }}/values-{{ .Environment.Name }}.yaml.gotmpl"
+      - "config/{{ .Release.Name }}/values.yaml.gotmpl"
+      - "config/{{ .Release.Name }}/values-{{ .Environment.Name }}.yaml.gotmpl"
+
+  # Сервис проекта на чарте app (go-server, envoy и др.): namespace = окружение
+  chart:
+    namespace: "{{ .Environment.Name }}"
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - "config/{{ .Release.Name }}/values.yaml.gotmpl"
+      - "config/{{ .Release.Name }}/values-{{ .Environment.Name }}.yaml.gotmpl"

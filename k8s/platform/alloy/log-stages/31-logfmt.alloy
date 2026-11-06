@@ -1,0 +1,11 @@
+// logfmt: level=info msg="..." (loki, grafana, prometheus, alloy)
+stage.match {
+  selector = `{namespace=~".+"} !~ "^\\{" |~ "(^|\\s)level=\\w+"`
+
+  stage.logfmt {
+    mapping = { level = "", message = "msg" }
+  }
+  stage.static_labels {
+    values = { format = "logfmt" }
+  }
+}

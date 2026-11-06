@@ -1,0 +1,11 @@
+// Access-логи nginx: уровень выводится из HTTP-статуса
+stage.match {
+  selector = `{namespace=~".+"} |~ "^\\S+ - \\S+ \\[[^\\]]+\\]\\s+(\"[^\"]*\" )?\\d{3} "`
+
+  stage.regex {
+    expression = `^\S+ - \S+ \[[^\]]+\]\s+(?:"[^"]*" )?(?P<level>\d{3}) `
+  }
+  stage.static_labels {
+    values = { format = "access" }
+  }
+}

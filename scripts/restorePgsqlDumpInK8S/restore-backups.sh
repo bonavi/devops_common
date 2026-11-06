@@ -35,6 +35,20 @@ BACKUPS_DIR="${BACKUPS_DIR:-$SCRIPT_DIR/backups}"
 NAMESPACE="postgres-${ENV}"
 LOCAL_PORT=15432
 
+# Ключ SOPS: если не передан (make do-k3s ACTION=restore-db уже кладёт его в окружение),
+# читаем через touchkey тем же load_sops_key, что и задачи make. Имя записи Keychain —
+# SOPS_KEYCHAIN_SERVICE из окружения или из Makefile проекта. Без touchkey — k8s/secrets/key.txt.
+if [[ -z "${SOPS_AGE_KEY:-}" && -z "${SOPS_AGE_KEY_FILE:-}" ]]; then
+  if [[ -z "${SOPS_KEYCHAIN_SERVICE:-}" && -f "$REPO_ROOT/Makefile" ]]; then
+    SOPS_KEYCHAIN_SERVICE="$(sed -n 's/^export SOPS_KEYCHAIN_SERVICE *:= *//p' "$REPO_ROOT/Makefile")"
+  fi
+  export SOPS_KEYCHAIN_SERVICE="${SOPS_KEYCHAIN_SERVICE:-}"
+  ROOT="$REPO_ROOT"
+  # shellcheck source=../make/lib.sh
+  source "$SCRIPT_DIR/../make/lib.sh"
+  load_sops_key
+fi
+
 shopt -s nullglob
 FILES=("$BACKUPS_DIR"/*)
 if [[ ${#FILES[@]} -eq 0 ]]; then

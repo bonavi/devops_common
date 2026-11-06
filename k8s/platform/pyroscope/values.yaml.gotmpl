@@ -1,0 +1,22 @@
+# Grafana Pyroscope (один экземпляр) — хранилище профилей.
+# Профили собирает Alloy (pull /debug/pprof по аннотациям profiles.grafana.com/*) и пишет
+# в endpoints.pyroscope. Встроенный агент чарта не нужен.
+pyroscope:
+  extraArgs:
+    log.level: info
+    # TODO: срок хранения 72 ч (как логи и трейсы) — найти параметр retention для Pyroscope 2.x;
+    # пока объём ограничен размером PVC
+
+  persistence:
+    enabled: true
+    size: 10Gi
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+alloy:
+  enabled: false

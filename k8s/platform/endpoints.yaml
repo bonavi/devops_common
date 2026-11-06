@@ -1,0 +1,26 @@
+# Адреса сервисов наблюдаемости внутри кластера — единственный источник.
+# Подключается в helmfile проекта первым values окружения:
+#   environments.<env>.values: [../common/k8s/platform/endpoints.yaml, cluster.yaml, ...]
+# Читаются как .Values.endpoints.* в values компонентов (Grafana, Alloy, Tempo, Promtail) и сервисов.
+# Переопределить любой адрес — тот же ключ в cluster.yaml проекта.
+endpoints:
+  # Логи: datasource Grafana и запись (+ /loki/api/v1/push)
+  loki: http://loki-headless.loki.svc.cluster.local:3100
+  # Метрики: Prometheus из kube-prometheus-stack (приём remote_write — + /api/v1/write)
+  prometheus: http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+  alloy:
+    # Веб-интерфейс Alloy (граф конвейеров, состояние компонентов)
+    ui: http://alloy.alloy.svc.cluster.local:12345
+    # Приём OTLP от сервисов (host:port, без схемы — так ждут OTel SDK)
+    otlpGrpc: alloy.alloy.svc.cluster.local:4317
+    otlpHttp: alloy.alloy.svc.cluster.local:4318
+    # Внешний адрес UI через ingress; пусто — ingress не создаётся.
+    # Включать только для домена из локальной сети: у UI Alloy нет авторизации
+    uiHost: ""
+  tempo:
+    # Запросы трейсов: datasource Grafana
+    url: http://tempo.tempo.svc.cluster.local:3200
+    # Приём OTLP gRPC (host:port) — сюда пишет Alloy
+    otlpGrpc: tempo.tempo.svc.cluster.local:4317
+  # Профили: datasource Grafana и запись из Alloy
+  pyroscope: http://pyroscope.pyroscope.svc.cluster.local:4040

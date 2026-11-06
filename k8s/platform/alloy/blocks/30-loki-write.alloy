@@ -1,0 +1,7 @@
+loki.write "default" {
+  endpoint {
+    url = "{{ .Values.endpoints.loki }}/loki/api/v1/push"
+  }
+  // Пока рядом работает Promtail — отличаем потоки Alloy
+  external_labels = { collector = "alloy" }
+}

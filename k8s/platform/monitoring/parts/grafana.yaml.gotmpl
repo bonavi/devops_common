@@ -1,0 +1,123 @@
+# ============================================================
+# Grafana — дашборды и визуализация
+# ============================================================
+grafana:
+  adminPassword: {{ .Values.grafana.adminPassword }}
+
+  env:
+    GF_DATABASE_PASSWORD: {{ .Values.pgsql.users.grafana.password }}
+
+  grafana.ini:
+    dashboards:
+      # Дашборд по умолчанию на главной странице Grafana (overview.json из grafana-dashboards, в корне)
+      default_home_dashboard_path: /var/lib/grafana/dashboards/default/overview.json
+    database:
+      type: postgres
+      host: postgres-postgresql.postgres-prod.svc.cluster.local:5432
+      name: grafana
+      user: grafana
+      password: $__env{GF_DATABASE_PASSWORD}
+      ssl_mode: disable
+
+{{- $features := .Values.cluster | get "features" dict }}
+{{- $tracing := $features | get "tracing" false }}
+{{- $profiling := $features | get "profiling" false }}
+{{- if or $tracing $profiling }}
+  # Loki получает постоянный UID (uid: loki). Grafana не умеет менять UID у уже созданного
+  # datasource («data source not found» при reload) — пересоздаём его на каждом provisioning.
+  # Безопасно: Loki целиком описан здесь, ссылки идут по постоянному UID
+  deleteDatasources:
+    - name: Loki
+      orgId: 1
+{{- end }}
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      url: {{ .Values.endpoints.loki }}
+      access: proxy
+{{- if or $tracing $profiling }}
+      # Постоянный UID — на него ссылаются переходы из Tempo. Только при трейсинге/профилировании:
+      # смена UID у существующего Loki сломала бы ссылки в уже сохранённых дашбордах
+      uid: loki
+{{- end }}
+{{- if $tracing }}
+      # Лог → трейс: traceID из structured metadata (его извлекает Alloy из JSON-логов)
+      jsonData:
+        derivedFields:
+          - name: traceID
+            matcherType: label
+            matcherRegex: traceID
+            datasourceUid: tempo
+            url: "${__value.raw}"
+            urlDisplayLabel: Трейс
+{{- end }}
+{{- if $tracing }}
+    # Трейсы. Переходы: трейс → логи и профиль того же пода (атрибуты k8s.* добавляет Alloy), граф сервисов
+    - name: Tempo
+      type: tempo
+      uid: tempo
+      url: {{ .Values.endpoints.tempo.url }}
+      access: proxy
+      jsonData:
+        tracesToLogsV2:
+          datasourceUid: loki
+          spanStartTimeShift: -5m
+          spanEndTimeShift: 5m
+          tags:
+            - key: k8s.namespace.name
+              value: namespace
+            - key: k8s.pod.name
+              value: pod
+        serviceMap:
+          datasourceUid: prometheus
+        nodeGraph:
+          enabled: true
+{{- if $profiling }}
+        tracesToProfiles:
+          datasourceUid: pyroscope
+          profileTypeId: "process_cpu:cpu:nanoseconds:cpu:nanoseconds"
+          tags:
+            - key: k8s.namespace.name
+              value: namespace
+            - key: k8s.pod.name
+              value: pod
+{{- end }}
+{{- end }}
+{{- if $profiling }}
+    # Профили (CPU, память, горутины) из /debug/pprof сервисов
+    - name: Pyroscope
+      type: grafana-pyroscope-datasource
+      uid: pyroscope
+      url: {{ .Values.endpoints.pyroscope }}
+      access: proxy
+{{- end }}
+
+  sidecar:
+    dashboards:
+      # Sidecar контейнер следит за ConfigMap'ами с лейблом grafana_dashboard=1
+      # и автоматически подгружает JSON дашборды без перезапуска Grafana
+      # Это единственный провайдер дашбордов из файлов: отдельный dashboardProviders на тот же
+      # каталог дублировал дашборды и лишал провайдеры права записи в БД
+      enabled: true
+      label: grafana_dashboard
+      folder: /var/lib/grafana/dashboards/default
+      # Папка в Grafana — из аннотации ConfigMap grafana_folder (без неё — корень)
+      folderAnnotation: grafana_folder
+      provider:
+        foldersFromFilesStructure: true
+      # Аннотации на ConfigMap стандартных дашбордов kube-prometheus-stack — все в папку Kubernetes
+      annotations:
+        grafana_folder: Kubernetes
+
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      # Автоматический выпуск TLS сертификата через cert-manager
+      cert-manager.io/cluster-issuer: letsencrypt
+    hosts:
+      - grafana.{{ .Values.cluster.domain }}
+    tls:
+      - secretName: grafana-tls
+        hosts:
+          - grafana.{{ .Values.cluster.domain }}

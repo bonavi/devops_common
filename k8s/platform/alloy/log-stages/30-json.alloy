@@ -1,0 +1,21 @@
+// JSON: {"level":"warn","message":"...","params":{...},"traceID":"..."}
+stage.match {
+  selector = `{namespace=~".+"} |~ "^\\{"`
+
+  stage.json {
+    expressions = {
+      level      = "level || severity",
+      message    = "message || msg",
+      systemInfo = "systemInfo",
+      params     = "params",
+      traceID    = "traceID",
+    }
+  }
+  stage.json {
+    expressions = { env = "env" }
+    source      = "systemInfo"
+  }
+  stage.static_labels {
+    values = { format = "json" }
+  }
+}

@@ -1,0 +1,72 @@
+resources:
+
+{{- $baseDir := "." }}
+
+{{- $rootFiles := readDir $baseDir }}
+{{- $rootJsonFiles := list }}
+
+{{- range $f := $rootFiles }}
+  {{- if hasSuffix ".json" $f }}
+    {{- $rootJsonFiles = append $rootJsonFiles $f }}
+  {{- end }}
+{{- end }}
+
+{{- if gt (len $rootJsonFiles) 0 }}
+
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: grafana-root-dashboards
+      namespace: monitoring
+      labels:
+        grafana_dashboard: "1"
+
+    data:
+{{- range $f := $rootJsonFiles }}
+      {{ base $f }}: |-
+{{ readFile $f | indent 8 }}
+{{- end }}
+
+{{- end }}
+{{- /* Справочник сервисов наблюдаемости: адреса из endpoints (../endpoints.yaml) и ссылки */}}
+{{- $e := .Values.endpoints }}
+{{- $features := .Values.cluster | get "features" dict }}
+{{- $rows := list
+      (printf "| Loki | логи | `%s` |" $e.loki)
+      (printf "| Prometheus | метрики | `%s` |" $e.prometheus)
+      (printf "| Alloy | сбор логов, OTLP, pprof | UI `%s`, OTLP gRPC `%s`, OTLP HTTP `%s` |" $e.alloy.ui $e.alloy.otlpGrpc $e.alloy.otlpHttp) }}
+{{- if ($features | get "tracing" false) }}
+{{- $rows = append $rows (printf "| Tempo | трейсы | запросы `%s`, OTLP gRPC `%s` |" $e.tempo.url $e.tempo.otlpGrpc) }}
+{{- end }}
+{{- if ($features | get "profiling" false) }}
+{{- $rows = append $rows (printf "| Pyroscope | профили | `%s` |" $e.pyroscope) }}
+{{- end }}
+{{- $ui := "" }}
+{{- with $e.alloy.uiHost }}{{ $ui = printf "\n\n**Alloy UI** (граф конвейеров): [https://%s](https://%s)" . . }}{{ end }}
+{{- $text := printf "Адреса внутри кластера `%s`. Источник — `common/k8s/platform/endpoints.yaml`, переопределение — `cluster.yaml` проекта.\n\n| Сервис | Что хранит/делает | Адрес |\n|---|---|---|\n%s%s\n\nOTLP для сервисов: `OTLP_HTTP_ENDPOINT=%s`, `OTLP_INSECURE=true`. Профили: аннотации пода `profiles.grafana.com/cpu.scrape: \"true\"` и `profiles.grafana.com/cpu.port`." (.Values.cluster.clusterName | default "") (join "\n" $rows) $ui $e.alloy.otlpHttp }}
+{{- $links := list (dict "title" "Логи (Explore)" "url" "/explore?left=%7B%22datasource%22:%22Loki%22%7D" "type" "link" "icon" "doc") }}
+{{- if ($features | get "tracing" false) }}{{ $links = append $links (dict "title" "Трейсы (Explore)" "url" "/explore?left=%7B%22datasource%22:%22tempo%22%7D" "type" "link" "icon" "doc") }}{{ end }}
+{{- if ($features | get "profiling" false) }}{{ $links = append $links (dict "title" "Профили" "url" "/a/grafana-pyroscope-app/" "type" "link" "icon" "doc") }}{{ end }}
+{{- with $e.alloy.uiHost }}{{ $links = append $links (dict "title" "Alloy UI" "url" (printf "https://%s" .) "type" "link" "icon" "external link" "targetBlank" true) }}{{ end }}
+{{- $dashboard := dict
+      "uid" "observability-services"
+      "title" "Сервисы наблюдаемости"
+      "tags" (list "наблюдаемость")
+      "schemaVersion" 39
+      "editable" false
+      "links" $links
+      "panels" (list (dict
+        "id" 1 "type" "text" "title" "Адреса и подключение"
+        "gridPos" (dict "h" 16 "w" 24 "x" 0 "y" 0)
+        "options" (dict "mode" "markdown" "content" $text))) }}
+
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: grafana-observability-services
+      namespace: monitoring
+      labels:
+        grafana_dashboard: "1"
+    data:
+      observability-services.json: |-
+{{ toPrettyJson $dashboard | indent 8 }}

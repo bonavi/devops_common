@@ -1,0 +1,18 @@
+# ClusterIssuer — один на кластер, все namespace используют его для выпуска сертификатов
+resources:
+  - apiVersion: cert-manager.io/v1
+    kind: ClusterIssuer
+    metadata:
+      name: letsencrypt
+    spec:
+      acme:
+        email: {{ .Values.cluster.acmeEmail }}
+        server: https://acme-v02.api.letsencrypt.org/directory
+        # Приватный ключ ACME-аккаунта, создаётся автоматически
+        privateKeySecretRef:
+          name: letsencrypt-cert
+        solvers:
+          # HTTP-01 challenge — Let's Encrypt стучится на домен через nginx
+          - http01:
+              ingress:
+                class: nginx

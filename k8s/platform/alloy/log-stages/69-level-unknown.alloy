@@ -1,0 +1,8 @@
+// Приводим level к единому набору: unknown
+stage.match {
+  selector = `{namespace=~".+", level!~"error|warn|info|debug"}`
+
+  stage.static_labels {
+    values = { level = "unknown" }
+  }
+}

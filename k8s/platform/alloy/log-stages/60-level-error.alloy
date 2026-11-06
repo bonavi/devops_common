@@ -1,0 +1,8 @@
+// Приводим level к единому набору: error
+stage.match {
+  selector = `{level=~"(?i)e|f|err|error|crit|critical|fatal|panic|alert|emerg|5\\d\\d"}`
+
+  stage.static_labels {
+    values = { level = "error" }
+  }
+}
