@@ -43,7 +43,7 @@ grafana:
       uid: loki
 {{- end }}
 {{- if $tracing }}
-    # Трейсы. Переходы: трейс → логи пода (по app и окну времени), → профиль, граф сервисов
+    # Трейсы. Переходы: трейс → логи и профиль того же пода (атрибуты k8s.* добавляет Alloy), граф сервисов
     - name: Tempo
       type: tempo
       uid: tempo
@@ -55,8 +55,10 @@ grafana:
           spanStartTimeShift: -5m
           spanEndTimeShift: 5m
           tags:
-            - key: service.name
-              value: app
+            - key: k8s.namespace.name
+              value: namespace
+            - key: k8s.pod.name
+              value: pod
         serviceMap:
           datasourceUid: prometheus
         nodeGraph:
@@ -66,8 +68,10 @@ grafana:
           datasourceUid: pyroscope
           profileTypeId: "process_cpu:cpu:nanoseconds:cpu:nanoseconds"
           tags:
-            - key: service.name
-              value: service_name
+            - key: k8s.namespace.name
+              value: namespace
+            - key: k8s.pod.name
+              value: pod
 {{- end }}
 {{- end }}
 {{- if $profiling }}
