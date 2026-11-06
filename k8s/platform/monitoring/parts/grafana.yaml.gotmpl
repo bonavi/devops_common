@@ -7,19 +7,9 @@ grafana:
   env:
     GF_DATABASE_PASSWORD: {{ .Values.pgsql.users.grafana.password }}
 
-  # Дашборд по умолчанию на главной странице Grafana
-  dashboardProviders:
-    dashboardproviders.yaml:
-      apiVersion: 1
-      providers:
-      - name: default
-        folder: ''
-        type: file
-        options:
-          path: /var/lib/grafana/dashboards/default
-
   grafana.ini:
     dashboards:
+      # Дашборд по умолчанию на главной странице Grafana (overview.json из grafana-dashboards, в корне)
       default_home_dashboard_path: /var/lib/grafana/dashboards/default/overview.json
     database:
       type: postgres
@@ -106,9 +96,18 @@ grafana:
     dashboards:
       # Sidecar контейнер следит за ConfigMap'ами с лейблом grafana_dashboard=1
       # и автоматически подгружает JSON дашборды без перезапуска Grafana
+      # Это единственный провайдер дашбордов из файлов: отдельный dashboardProviders на тот же
+      # каталог дублировал дашборды и лишал провайдеры права записи в БД
       enabled: true
       label: grafana_dashboard
       folder: /var/lib/grafana/dashboards/default
+      # Папка в Grafana — из аннотации ConfigMap grafana_folder (без неё — корень)
+      folderAnnotation: grafana_folder
+      provider:
+        foldersFromFilesStructure: true
+      # Аннотации на ConfigMap стандартных дашбордов kube-prometheus-stack — все в папку Kubernetes
+      annotations:
+        grafana_folder: Kubernetes
 
   ingress:
     enabled: true
