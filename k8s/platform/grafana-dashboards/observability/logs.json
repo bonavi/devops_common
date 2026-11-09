@@ -236,7 +236,7 @@
         "spec": {
           "id": 1,
           "title": "Объём логов по уровням",
-          "description": "",
+          "description": "Клик по серии — фильтр по этому уровню",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -303,7 +303,14 @@
                       "mode": "normal"
                     }
                   },
-                  "min": 0
+                  "min": 0,
+                  "links": [
+                    {
+                      "title": "Фильтр: ${__field.labels.lvl}",
+                      "oneClick": true,
+                      "url": "/d/${__dashboard.uid}?${__url_time_range}&${namespace:queryparam}&${pod:queryparam}&${search:queryparam}&${app:queryparam}&var-level=${__field.labels.lvl}"
+                    }
+                  ]
                 },
                 "overrides": [
                   {
@@ -473,7 +480,7 @@
         "spec": {
           "id": 3,
           "title": "Ошибки по app во времени",
-          "description": "",
+          "description": "Клик по серии — фильтр по этому app",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -540,7 +547,14 @@
                       "mode": "normal"
                     }
                   },
-                  "min": 0
+                  "min": 0,
+                  "links": [
+                    {
+                      "title": "Фильтр: ${__field.labels.app}",
+                      "oneClick": true,
+                      "url": "/d/${__dashboard.uid}?${__url_time_range}&${namespace:queryparam}&${pod:queryparam}&${search:queryparam}&${level:queryparam}&var-app=${__field.labels.app}"
+                    }
+                  ]
                 },
                 "overrides": [
                   {
@@ -591,7 +605,7 @@
         "spec": {
           "id": 4,
           "title": "Ошибки по app за период",
-          "description": "",
+          "description": "Клик по серии — фильтр по этому app",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -634,7 +648,14 @@
                     "mode": "fixed"
                   },
                   "min": 0,
-                  "unit": "short"
+                  "unit": "short",
+                  "links": [
+                    {
+                      "title": "Фильтр: ${__field.labels.app}",
+                      "oneClick": true,
+                      "url": "/d/${__dashboard.uid}?${__url_time_range}&${namespace:queryparam}&${pod:queryparam}&${search:queryparam}&${level:queryparam}&var-app=${__field.labels.app}"
+                    }
+                  ]
                 },
                 "overrides": []
               },
@@ -718,7 +739,7 @@
         "spec": {
           "id": 6,
           "title": "Объём по уровням: $app",
-          "description": "",
+          "description": "Клик по серии — фильтр по этому уровню",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -785,7 +806,14 @@
                       "mode": "normal"
                     }
                   },
-                  "min": 0
+                  "min": 0,
+                  "links": [
+                    {
+                      "title": "Фильтр: ${__field.labels.lvl}",
+                      "oneClick": true,
+                      "url": "/d/${__dashboard.uid}?${__url_time_range}&${namespace:queryparam}&${pod:queryparam}&${search:queryparam}&${app:queryparam}&var-level=${__field.labels.lvl}"
+                    }
+                  ]
                 },
                 "overrides": [
                   {
@@ -955,7 +983,7 @@
         "spec": {
           "id": 8,
           "title": "По app: ${level:text}",
-          "description": "",
+          "description": "Клик по серии — фильтр по этому app",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1022,7 +1050,14 @@
                       "mode": "normal"
                     }
                   },
-                  "min": 0
+                  "min": 0,
+                  "links": [
+                    {
+                      "title": "Фильтр: ${__field.labels.app}",
+                      "oneClick": true,
+                      "url": "/d/${__dashboard.uid}?${__url_time_range}&${namespace:queryparam}&${pod:queryparam}&${search:queryparam}&${level:queryparam}&var-app=${__field.labels.app}"
+                    }
+                  ]
                 },
                 "overrides": [
                   {
