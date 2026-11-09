@@ -29,7 +29,8 @@ resources:
 
 {{- end }}
 {{- /* Дашборды наблюдаемости из observability/ — в папку Observability.
-       Логи — всегда, трейсы и профили — если в кластере включены features.tracing / features.profiling */}}
+       Логи — всегда, трейсы и профили — если в кластере включены features.tracing / features.profiling.
+       logs.json — формат v2 (вкладки) в K8s-обёртке: apiVersion dashboard.grafana.app/v2, kind, metadata.name, spec */}}
 {{- $obsFeatures := .Values.cluster | get "features" dict }}
 {{- $obsFiles := list "logs.json" }}
 {{- if ($obsFeatures | get "tracing" false) }}{{ $obsFiles = append $obsFiles "traces.json" }}{{ end }}
