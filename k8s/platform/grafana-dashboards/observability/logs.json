@@ -405,7 +405,7 @@
                   ],
                   "displayMode": "table",
                   "placement": "right",
-                  "showLegend": true
+                  "showLegend": false
                 },
                 "tooltip": {
                   "mode": "multi",
@@ -443,265 +443,6 @@
                         "expr": "{namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"${level:pipe}\" |~ `(?i)$search` | json log_msg=\"message\", params_raw=\"params\" | drop __error__, __error_details__ | line_format `[{{ .app }}] {{ if .log_msg }}{{ .log_msg }}{{ if .params_raw }}\n└─ {{ .params_raw | replace \"{\\\"\" \"\" | replace \"\\\"}\" \"\" | replace \"\\\":\\\"\" \"=\" | replace \"\\\",\\\"\" \" | \" | replace \"\\\"\" \"\" }}{{ end }}{{ else }}{{ __line__ }}{{ end }}`",
                         "queryType": "range",
                         "maxLines": 1000
-                      }
-                    }
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "logs",
-            "version": "",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {},
-                "overrides": []
-              },
-              "options": {
-                "dedupStrategy": "none",
-                "enableLogDetails": true,
-                "prettifyLogMessage": false,
-                "showCommonLabels": false,
-                "showLabels": false,
-                "showTime": true,
-                "sortOrder": "Descending",
-                "wrapLogMessage": true
-              }
-            }
-          }
-        }
-      },
-      "errTs": {
-        "kind": "Panel",
-        "spec": {
-          "id": 3,
-          "title": "Ошибки по app во времени",
-          "description": "Клик по серии — фильтр по этому app",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "refId": "A",
-                    "hidden": false,
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "loki",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "sum by (app) (count_over_time({namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"error|critical|fatal\" |~ `(?i)$search` [$__auto]))",
-                        "queryType": "range",
-                        "legendFormat": "{{app}}"
-                      }
-                    }
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "refId": "B",
-                    "hidden": false,
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "loki",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "sum(count_over_time({namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"error|critical|fatal\" |~ `(?i)$search` [$__auto]))",
-                        "queryType": "range",
-                        "legendFormat": "Всего"
-                      }
-                    }
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "timeseries",
-            "version": "",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "custom": {
-                    "drawStyle": "bars",
-                    "fillOpacity": 80,
-                    "lineWidth": 0,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "normal"
-                    }
-                  },
-                  "min": 0,
-                  "links": [
-                    {
-                      "title": "Фильтр: ${__field.labels.app}",
-                      "oneClick": true,
-                      "url": "/d/${__dashboard.uid}?${__url_time_range}&${namespace:queryparam}&${pod:queryparam}&${search:queryparam}&${level:queryparam}&var-app=${__field.labels.app}"
-                    }
-                  ]
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Всего"
-                    },
-                    "properties": [
-                      {
-                        "id": "custom.hideFrom",
-                        "value": {
-                          "legend": false,
-                          "tooltip": false,
-                          "viz": true
-                        }
-                      },
-                      {
-                        "id": "custom.stacking",
-                        "value": {
-                          "group": "total",
-                          "mode": "none"
-                        }
-                      }
-                    ]
-                  }
-                ]
-              },
-              "options": {
-                "legend": {
-                  "calcs": [
-                    "sum"
-                  ],
-                  "displayMode": "table",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "desc"
-                }
-              }
-            }
-          }
-        }
-      },
-      "errBar": {
-        "kind": "Panel",
-        "spec": {
-          "id": 4,
-          "title": "Ошибки по app за период",
-          "description": "Клик по серии — фильтр по этому app",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "refId": "A",
-                    "hidden": false,
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "loki",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "sort_desc(sum by (app) (count_over_time({namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"error|critical|fatal\" |~ `(?i)$search` [$__range])))",
-                        "queryType": "instant",
-                        "legendFormat": "{{app}}"
-                      }
-                    }
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "bargauge",
-            "version": "",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "fixedColor": "red",
-                    "mode": "fixed"
-                  },
-                  "min": 0,
-                  "unit": "short",
-                  "links": [
-                    {
-                      "title": "Фильтр: ${__field.labels.app}",
-                      "oneClick": true,
-                      "url": "/d/${__dashboard.uid}?${__url_time_range}&${namespace:queryparam}&${pod:queryparam}&${search:queryparam}&${level:queryparam}&var-app=${__field.labels.app}"
-                    }
-                  ]
-                },
-                "overrides": []
-              },
-              "options": {
-                "displayMode": "basic",
-                "orientation": "horizontal",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showUnfilled": true
-              }
-            }
-          }
-        }
-      },
-      "errLogs": {
-        "kind": "Panel",
-        "spec": {
-          "id": 5,
-          "title": "Последние ошибки",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "refId": "A",
-                    "hidden": false,
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "loki",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "{namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"error|critical|fatal\" |~ `(?i)$search` | json log_msg=\"message\", params_raw=\"params\" | drop __error__, __error_details__ | line_format `[{{ .app }}] {{ if .log_msg }}{{ .log_msg }}{{ if .params_raw }}\n└─ {{ .params_raw | replace \"{\\\"\" \"\" | replace \"\\\"}\" \"\" | replace \"\\\":\\\"\" \"=\" | replace \"\\\",\\\"\" \" | \" | replace \"\\\"\" \"\" }}{{ end }}{{ else }}{{ __line__ }}{{ end }}`",
-                        "queryType": "range",
-                        "maxLines": 500
                       }
                     }
                   }
@@ -908,7 +649,7 @@
                   ],
                   "displayMode": "table",
                   "placement": "right",
-                  "showLegend": true
+                  "showLegend": false
                 },
                 "tooltip": {
                   "mode": "multi",
@@ -1092,7 +833,7 @@
                   ],
                   "displayMode": "table",
                   "placement": "right",
-                  "showLegend": true
+                  "showLegend": false
                 },
                 "tooltip": {
                   "mode": "multi",
@@ -1161,6 +902,440 @@
             }
           }
         }
+      },
+      "allLvlPie": {
+        "kind": "Panel",
+        "spec": {
+          "id": 10,
+          "title": "По уровням за период",
+          "description": "Доля уровней за период. Клик по сектору — фильтр по этому уровню",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "A",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum by (lvl) (count_over_time({namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"${level:pipe}\" |~ `(?i)$search` [$__auto]))",
+                        "legendFormat": "{{lvl}}",
+                        "queryType": "range"
+                      }
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": [
+                {
+                  "kind": "reduce",
+                  "spec": {
+                    "id": "reduce",
+                    "options": {
+                      "mode": "reduceFields",
+                      "reducers": [
+                        "sum"
+                      ],
+                      "includeTimeField": false
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "piechart",
+            "version": "",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "min": 0,
+                  "unit": "short",
+                  "links": [
+                    {
+                      "title": "Фильтр: ${__field.labels.lvl}",
+                      "oneClick": true,
+                      "url": "/d/${__dashboard.uid}?${__url_time_range}&${namespace:queryparam}&${pod:queryparam}&${search:queryparam}&${app:queryparam}&var-level=${__field.labels.lvl}"
+                    }
+                  ]
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/^(error|critical|fatal)$/i"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "red",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/^warn(ing)?$/i"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "yellow",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/^info$/i"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "green",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/^debug$/i"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "blue",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/^unknown$/i"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "#808080",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              "options": {
+                "pieType": "donut",
+                "displayLabels": [],
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "legend": {
+                  "showLegend": false,
+                  "displayMode": "list",
+                  "placement": "right",
+                  "values": []
+                },
+                "tooltip": {
+                  "mode": "single",
+                  "sort": "none"
+                }
+              }
+            }
+          }
+        }
+      },
+      "appLvlPie": {
+        "kind": "Panel",
+        "spec": {
+          "id": 11,
+          "title": "По уровням: $app",
+          "description": "Доля уровней за период. Клик по сектору — фильтр по этому уровню",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "A",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum by (lvl) (count_over_time({namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"${level:pipe}\" |~ `(?i)$search` [$__auto]))",
+                        "legendFormat": "{{lvl}}",
+                        "queryType": "range"
+                      }
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": [
+                {
+                  "kind": "reduce",
+                  "spec": {
+                    "id": "reduce",
+                    "options": {
+                      "mode": "reduceFields",
+                      "reducers": [
+                        "sum"
+                      ],
+                      "includeTimeField": false
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "piechart",
+            "version": "",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "min": 0,
+                  "unit": "short",
+                  "links": [
+                    {
+                      "title": "Фильтр: ${__field.labels.lvl}",
+                      "oneClick": true,
+                      "url": "/d/${__dashboard.uid}?${__url_time_range}&${namespace:queryparam}&${pod:queryparam}&${search:queryparam}&${app:queryparam}&var-level=${__field.labels.lvl}"
+                    }
+                  ]
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/^(error|critical|fatal)$/i"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "red",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/^warn(ing)?$/i"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "yellow",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/^info$/i"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "green",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/^debug$/i"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "blue",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/^unknown$/i"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "#808080",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              "options": {
+                "pieType": "donut",
+                "displayLabels": [],
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "legend": {
+                  "showLegend": false,
+                  "displayMode": "list",
+                  "placement": "right",
+                  "values": []
+                },
+                "tooltip": {
+                  "mode": "single",
+                  "sort": "none"
+                }
+              }
+            }
+          }
+        }
+      },
+      "lvlAppPie": {
+        "kind": "Panel",
+        "spec": {
+          "id": 12,
+          "title": "Доля app: ${level:text}",
+          "description": "Доля app в этом уровне за период. Клик по сектору — фильтр по этому app",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "A",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum by (app) (count_over_time({namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"${level:pipe}\" |~ `(?i)$search` [$__auto]))",
+                        "legendFormat": "{{app}}",
+                        "queryType": "range"
+                      }
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": [
+                {
+                  "kind": "reduce",
+                  "spec": {
+                    "id": "reduce",
+                    "options": {
+                      "mode": "reduceFields",
+                      "reducers": [
+                        "sum"
+                      ],
+                      "includeTimeField": false
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "piechart",
+            "version": "",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "min": 0,
+                  "unit": "short",
+                  "links": [
+                    {
+                      "title": "Фильтр: ${__field.labels.app}",
+                      "oneClick": true,
+                      "url": "/d/${__dashboard.uid}?${__url_time_range}&${namespace:queryparam}&${pod:queryparam}&${search:queryparam}&${level:queryparam}&var-app=${__field.labels.app}"
+                    }
+                  ]
+                },
+                "overrides": []
+              },
+              "options": {
+                "pieType": "donut",
+                "displayLabels": [],
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "legend": {
+                  "showLegend": false,
+                  "displayMode": "list",
+                  "placement": "right",
+                  "values": []
+                },
+                "tooltip": {
+                  "mode": "single",
+                  "sort": "none"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "layout": {
@@ -1185,7 +1360,20 @@
                         },
                         "x": 0,
                         "y": 0,
-                        "width": 24,
+                        "width": 18,
+                        "height": 6
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "allLvlPie"
+                        },
+                        "x": 18,
+                        "y": 0,
+                        "width": 6,
                         "height": 6
                       }
                     },
@@ -1210,61 +1398,8 @@
           {
             "kind": "RowsLayoutRow",
             "spec": {
-              "title": "Ошибки",
-              "collapse": false,
-              "layout": {
-                "kind": "GridLayout",
-                "spec": {
-                  "items": [
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "errTs"
-                        },
-                        "x": 0,
-                        "y": 0,
-                        "width": 16,
-                        "height": 8
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "errBar"
-                        },
-                        "x": 16,
-                        "y": 0,
-                        "width": 8,
-                        "height": 8
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "errLogs"
-                        },
-                        "x": 0,
-                        "y": 8,
-                        "width": 24,
-                        "height": 12
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          {
-            "kind": "RowsLayoutRow",
-            "spec": {
               "title": "Сервисы",
-              "collapse": true,
+              "collapse": false,
               "layout": {
                 "kind": "TabsLayout",
                 "spec": {
@@ -1290,7 +1425,20 @@
                                   },
                                   "x": 0,
                                   "y": 0,
-                                  "width": 24,
+                                  "width": 18,
+                                  "height": 6
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "appLvlPie"
+                                  },
+                                  "x": 18,
+                                  "y": 0,
+                                  "width": 6,
                                   "height": 6
                                 }
                               },
@@ -1321,7 +1469,7 @@
             "kind": "RowsLayoutRow",
             "spec": {
               "title": "Уровни",
-              "collapse": true,
+              "collapse": false,
               "layout": {
                 "kind": "TabsLayout",
                 "spec": {
@@ -1347,7 +1495,20 @@
                                   },
                                   "x": 0,
                                   "y": 0,
-                                  "width": 24,
+                                  "width": 18,
+                                  "height": 6
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "lvlAppPie"
+                                  },
+                                  "x": 18,
+                                  "y": 0,
+                                  "width": 6,
                                   "height": 6
                                 }
                               },
