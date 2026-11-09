@@ -28,6 +28,28 @@ resources:
 {{- end }}
 
 {{- end }}
+{{- /* Дашборды наблюдаемости из observability/ — в папку Observability.
+       Логи — всегда, трейсы и профили — если в кластере включены features.tracing / features.profiling */}}
+{{- $obsFeatures := .Values.cluster | get "features" dict }}
+{{- $obsFiles := list "logs.json" }}
+{{- if ($obsFeatures | get "tracing" false) }}{{ $obsFiles = append $obsFiles "traces.json" }}{{ end }}
+{{- if ($obsFeatures | get "profiling" false) }}{{ $obsFiles = append $obsFiles "profiles.json" }}{{ end }}
+
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: grafana-observability-dashboards
+      namespace: monitoring
+      labels:
+        grafana_dashboard: "1"
+      annotations:
+        grafana_folder: Observability
+    data:
+{{- range $f := $obsFiles }}
+      {{ $f }}: |-
+{{ readFile (printf "observability/%s" $f) | indent 8 }}
+{{- end }}
+
 {{- /* Справочник сервисов наблюдаемости: адреса из endpoints (../endpoints.yaml) и ссылки */}}
 {{- $e := .Values.endpoints }}
 {{- $features := .Values.cluster | get "features" dict }}
@@ -67,6 +89,8 @@ resources:
       namespace: monitoring
       labels:
         grafana_dashboard: "1"
+      annotations:
+        grafana_folder: Observability
     data:
       observability-services.json: |-
 {{ toPrettyJson $dashboard | indent 8 }}

@@ -1,0 +1,896 @@
+{
+  "uid": "observability-logs",
+  "title": "Логи",
+  "tags": [
+    "logs",
+    "loki",
+    "observability"
+  ],
+  "timezone": "browser",
+  "editable": false,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "schemaVersion": 39,
+  "links": [
+    {
+      "title": "Трейсы",
+      "type": "link",
+      "url": "/d/observability-traces",
+      "icon": "doc"
+    },
+    {
+      "title": "Профили",
+      "type": "link",
+      "url": "/d/observability-profiles",
+      "icon": "doc"
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Loki",
+        "type": "datasource",
+        "query": "loki",
+        "current": {
+          "text": "Loki",
+          "value": "Loki"
+        },
+        "hide": 2
+      },
+      {
+        "name": "namespace",
+        "label": "Namespace",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "label": "namespace",
+          "stream": "",
+          "type": 1,
+          "refId": "namespace"
+        },
+        "definition": "",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".+",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "sort": 1
+      },
+      {
+        "name": "app",
+        "label": "App",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "label": "app",
+          "stream": "{namespace=~\"${namespace:regex}\"}",
+          "type": 1,
+          "refId": "app"
+        },
+        "definition": "",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "sort": 1
+      },
+      {
+        "name": "pod",
+        "label": "Pod",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "label": "pod",
+          "stream": "{namespace=~\"${namespace:regex}\", app=~\"${app:regex}\"}",
+          "type": 1,
+          "refId": "pod"
+        },
+        "definition": "",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "sort": 1
+      },
+      {
+        "name": "level",
+        "label": "Уровень",
+        "type": "custom",
+        "query": "error : error|critical|fatal,warn : warn,info : info,debug : debug|trace,без уровня : unknown",
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "name": "search",
+        "label": "Поиск (regex)",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 100,
+      "type": "row",
+      "title": "Все логи",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Объём логов по уровням",
+      "datasource": {
+        "type": "loki",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            }
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Всего"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              },
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "group": "total",
+                  "mode": "none"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^(error|critical|fatal)$/i"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^warn(ing)?$/i"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^info$/i"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^unknown$/i"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#808080",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (lvl) (count_over_time({namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"${level:pipe}\" |~ `(?i)$search` [$__auto]))",
+          "legendFormat": "{{lvl}}",
+          "queryType": "range"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(count_over_time({namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"${level:pipe}\" |~ `(?i)$search` [$__auto]))",
+          "legendFormat": "Всего",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "logs",
+      "title": "Логи",
+      "datasource": {
+        "type": "loki",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 20,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource}"
+          },
+          "expr": "{namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"${level:pipe}\" |~ `(?i)$search` | json log_msg=\"message\", params_raw=\"params\" | drop __error__, __error_details__ | line_format `[{{ .app }}] {{ if .log_msg }}{{ .log_msg }}{{ if .params_raw }}\n└─ {{ .params_raw | replace \"{\\\"\" \"\" | replace \"\\\"}\" \"\" | replace \"\\\":\\\"\" \"=\" | replace \"\\\",\\\"\" \" | \" | replace \"\\\"\" \"\" }}{{ end }}{{ else }}{{ __line__ }}{{ end }}`",
+          "maxLines": 1000,
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 101,
+      "type": "row",
+      "title": "Ошибки",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
+      "panels": []
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Ошибки по app во времени",
+      "datasource": {
+        "type": "loki",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 0,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            }
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Всего"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              },
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "group": "total",
+                  "mode": "none"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (app) (count_over_time({namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"error|critical|fatal\" |~ `(?i)$search` [$__auto]))",
+          "legendFormat": "{{app}}",
+          "queryType": "range"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(count_over_time({namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"error|critical|fatal\" |~ `(?i)$search` [$__auto]))",
+          "legendFormat": "Всего",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "bargauge",
+      "title": "Ошибки по app за период",
+      "datasource": {
+        "type": "loki",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "red",
+            "mode": "fixed"
+          },
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "basic",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource}"
+          },
+          "expr": "sort_desc(sum by (app) (count_over_time({namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"error|critical|fatal\" |~ `(?i)$search` [$__range])))",
+          "legendFormat": "{{app}}",
+          "queryType": "instant"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "logs",
+      "title": "Последние ошибки",
+      "datasource": {
+        "type": "loki",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 36
+      },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource}"
+          },
+          "expr": "{namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"error|critical|fatal\" |~ `(?i)$search` | json log_msg=\"message\", params_raw=\"params\" | drop __error__, __error_details__ | line_format `[{{ .app }}] {{ if .log_msg }}{{ .log_msg }}{{ if .params_raw }}\n└─ {{ .params_raw | replace \"{\\\"\" \"\" | replace \"\\\"}\" \"\" | replace \"\\\":\\\"\" \"=\" | replace \"\\\",\\\"\" \" | \" | replace \"\\\"\" \"\" }}{{ end }}{{ else }}{{ __line__ }}{{ end }}`",
+          "maxLines": 500,
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 102,
+      "type": "row",
+      "title": "Сервис: $app",
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 48
+      },
+      "panels": [
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Объём по уровням: $app",
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 24,
+            "x": 0,
+            "y": 49
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "bars",
+                "fillOpacity": 80,
+                "lineWidth": 0,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                }
+              },
+              "min": 0
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Всего"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hideFrom",
+                    "value": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": true
+                    }
+                  },
+                  {
+                    "id": "custom.stacking",
+                    "value": {
+                      "group": "total",
+                      "mode": "none"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^(error|critical|fatal)$/i"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^warn(ing)?$/i"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "yellow",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^info$/i"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "green",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^unknown$/i"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#808080",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": {
+              "calcs": [
+                "sum"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource}"
+              },
+              "expr": "sum by (lvl) (count_over_time({namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"${level:pipe}\" |~ `(?i)$search` [$__auto]))",
+              "legendFormat": "{{lvl}}",
+              "queryType": "range"
+            },
+            {
+              "refId": "B",
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource}"
+              },
+              "expr": "sum(count_over_time({namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"${level:pipe}\" |~ `(?i)$search` [$__auto]))",
+              "legendFormat": "Всего",
+              "queryType": "range"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "type": "logs",
+          "title": "Логи: $app",
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 14,
+            "w": 24,
+            "x": 0,
+            "y": 55
+          },
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "prettifyLogMessage": false,
+            "showCommonLabels": false,
+            "showLabels": false,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource}"
+              },
+              "expr": "{namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"${level:pipe}\" |~ `(?i)$search` | json log_msg=\"message\", params_raw=\"params\" | drop __error__, __error_details__ | line_format `[{{ .app }}] {{ if .log_msg }}{{ .log_msg }}{{ if .params_raw }}\n└─ {{ .params_raw | replace \"{\\\"\" \"\" | replace \"\\\"}\" \"\" | replace \"\\\":\\\"\" \"=\" | replace \"\\\",\\\"\" \" | \" | replace \"\\\"\" \"\" }}{{ end }}{{ else }}{{ __line__ }}{{ end }}`",
+              "maxLines": 500,
+              "queryType": "range"
+            }
+          ]
+        }
+      ],
+      "repeat": "app"
+    },
+    {
+      "id": 103,
+      "type": "row",
+      "title": "Уровень: ${level:text}",
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 49
+      },
+      "panels": [
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "По app: ${level:text}",
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 24,
+            "x": 0,
+            "y": 50
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "bars",
+                "fillOpacity": 80,
+                "lineWidth": 0,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                }
+              },
+              "min": 0
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Всего"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hideFrom",
+                    "value": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": true
+                    }
+                  },
+                  {
+                    "id": "custom.stacking",
+                    "value": {
+                      "group": "total",
+                      "mode": "none"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": {
+              "calcs": [
+                "sum"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource}"
+              },
+              "expr": "sum by (app) (count_over_time({namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"${level:pipe}\" |~ `(?i)$search` [$__auto]))",
+              "legendFormat": "{{app}}",
+              "queryType": "range"
+            },
+            {
+              "refId": "B",
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource}"
+              },
+              "expr": "sum(count_over_time({namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"${level:pipe}\" |~ `(?i)$search` [$__auto]))",
+              "legendFormat": "Всего",
+              "queryType": "range"
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "type": "logs",
+          "title": "Логи: ${level:text}",
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 14,
+            "w": 24,
+            "x": 0,
+            "y": 56
+          },
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "prettifyLogMessage": false,
+            "showCommonLabels": false,
+            "showLabels": false,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource}"
+              },
+              "expr": "{namespace=~\"${namespace:regex}\", app=~\"${app:regex}\", pod=~\"${pod:regex}\"} | label_format lvl=`{{ or .level .detected_level \"unknown\" | ToLower | replace \"warning\" \"warn\" }}` | lvl=~\"${level:pipe}\" |~ `(?i)$search` | json log_msg=\"message\", params_raw=\"params\" | drop __error__, __error_details__ | line_format `[{{ .app }}] {{ if .log_msg }}{{ .log_msg }}{{ if .params_raw }}\n└─ {{ .params_raw | replace \"{\\\"\" \"\" | replace \"\\\"}\" \"\" | replace \"\\\":\\\"\" \"=\" | replace \"\\\",\\\"\" \" | \" | replace \"\\\"\" \"\" }}{{ end }}{{ else }}{{ __line__ }}{{ end }}`",
+              "maxLines": 500,
+              "queryType": "range"
+            }
+          ]
+        }
+      ],
+      "repeat": "level"
+    }
+  ]
+}
