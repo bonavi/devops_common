@@ -16,6 +16,13 @@ resources:
         END $$;
         SELECT 'CREATE DATABASE {{ $name }} OWNER {{ $name }}'
           WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '{{ $name }}')\gexec
+        {{- with $val.extensions }}
+        -- Расширения создаёт суперпользователь: владельцу базы прав на это не хватает
+        \c {{ $name }}
+        {{- range . }}
+        CREATE EXTENSION IF NOT EXISTS {{ . }} CASCADE;
+        {{- end }}
+        {{- end }}
         {{- end }}
 
   - apiVersion: batch/v1
