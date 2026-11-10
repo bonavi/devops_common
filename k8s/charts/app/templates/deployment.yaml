@@ -37,6 +37,7 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
+      enableServiceLinks: {{ .Values.enableServiceLinks }}
       {{- if .Values.hostNetwork }}
       hostNetwork: true
       dnsPolicy: {{ .Values.dnsPolicy | default "ClusterFirstWithHostNet" }}

@@ -16,6 +16,11 @@ serviceAccount:
 
 replicaCount: 1
 
+# Переменные <СЕРВИС>_PORT/_HOST от всех сервисов namespace в окружении пода.
+# Выключать, если приложение читает переменную с таким же именем: сервис immich
+# даёт IMMICH_PORT=tcp://…, и Immich падает, приняв его за свой порт.
+enableServiceLinks: true
+
 hostNetwork: false
 dnsPolicy: ""
 
