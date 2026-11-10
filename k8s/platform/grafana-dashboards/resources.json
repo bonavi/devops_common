@@ -268,10 +268,97 @@
           }
         }
       },
-      "cpuLimits": {
+      "cpuRequests": {
         "kind": "Panel",
         "spec": {
           "id": 3,
+          "title": "Сумма requests CPU",
+          "description": "Сколько CPU ноды гарантировано подам. До 100% — новые поды перестанут помещаться на ноду (Pending)",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "A",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "100 * sum(kube_pod_container_resource_requests{resource=\"cpu\"} unless on (namespace, pod) (kube_pod_status_phase{phase=~\"Succeeded|Failed\"} == 1)) / sum(kube_node_status_allocatable{resource=\"cpu\"})",
+                        "legendFormat": "",
+                        "range": false,
+                        "instant": true,
+                        "format": "time_series"
+                      }
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percent",
+                  "decimals": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "orange",
+                        "value": 80
+                      },
+                      {
+                        "color": "red",
+                        "value": 95
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "colorMode": "value",
+                "graphMode": "area",
+                "textMode": "value",
+                "justifyMode": "auto"
+              }
+            }
+          }
+        }
+      },
+      "cpuLimits": {
+        "kind": "Panel",
+        "spec": {
+          "id": 4,
           "title": "Сумма лимитов CPU",
           "description": "Сколько процентов CPU ноды обещано лимитами. Больше 100% — если все упрутся в лимит, на всех не хватит",
           "links": [],
@@ -358,7 +445,7 @@
       "cpuApps": {
         "kind": "Panel",
         "spec": {
-          "id": 4,
+          "id": 5,
           "title": "CPU приложений",
           "description": "Сумма по контейнерам. Разница с загрузкой ноды — k3s, containerd и процессы хоста",
           "links": [],
@@ -429,7 +516,7 @@
       "cpuSeries": {
         "kind": "Panel",
         "spec": {
-          "id": 5,
+          "id": 6,
           "title": "CPU по приложениям — накопительно",
           "description": "",
           "links": [],
@@ -509,7 +596,7 @@
       "cpuLines": {
         "kind": "Panel",
         "spec": {
-          "id": 6,
+          "id": 7,
           "title": "CPU по приложениям — по отдельности",
           "description": "Без накопления: видно, какое приложение выбивается",
           "links": [],
@@ -589,7 +676,7 @@
       "cpuPct": {
         "kind": "Panel",
         "spec": {
-          "id": 7,
+          "id": 8,
           "title": "CPU от лимита",
           "description": "Сколько процентов своего лимита использует контейнер сейчас",
           "links": [],
@@ -695,7 +782,7 @@
       "cpuThrottle": {
         "kind": "Panel",
         "spec": {
-          "id": 8,
+          "id": 9,
           "title": "Троттлинг",
           "description": "Доля периодов, когда контейнер упёрся в лимит CPU и был приторможен. Постоянно высокий — лимит мал или приложение перегружено",
           "links": [],
@@ -801,7 +888,7 @@
       "cpuTable": {
         "kind": "Panel",
         "spec": {
-          "id": 9,
+          "id": 10,
           "title": "Контейнеры: CPU",
           "description": "",
           "links": [],
@@ -844,7 +931,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum by (namespace, container) (kube_pod_container_resource_requests{resource=\"cpu\", namespace=~\"${namespace:regex}\"} unless on (namespace, pod) (kube_pod_status_phase{phase=~\"Succeeded|Failed\"} == 1))",
+                        "expr": "(sum by (namespace, container) (kube_pod_container_resource_requests{resource=\"cpu\", namespace=~\"${namespace:regex}\"} unless on (namespace, pod) (kube_pod_status_phase{phase=~\"Succeeded|Failed\"} == 1))) or (0 * sum by (namespace, container) (rate(container_cpu_usage_seconds_total{container!=\"\", container!=\"POD\", namespace=~\"${namespace:regex}\"}[$__rate_interval])))",
                         "legendFormat": "__auto",
                         "range": false,
                         "instant": true,
@@ -866,7 +953,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum by (namespace, container) (kube_pod_container_resource_limits{resource=\"cpu\", namespace=~\"${namespace:regex}\"} unless on (namespace, pod) (kube_pod_status_phase{phase=~\"Succeeded|Failed\"} == 1))",
+                        "expr": "(sum by (namespace, container) (kube_pod_container_resource_limits{resource=\"cpu\", namespace=~\"${namespace:regex}\"} unless on (namespace, pod) (kube_pod_status_phase{phase=~\"Succeeded|Failed\"} == 1))) or (0 * sum by (namespace, container) (rate(container_cpu_usage_seconds_total{container!=\"\", container!=\"POD\", namespace=~\"${namespace:regex}\"}[$__rate_interval])))",
                         "legendFormat": "__auto",
                         "range": false,
                         "instant": true,
@@ -879,6 +966,28 @@
                   "kind": "PanelQuery",
                   "spec": {
                     "refId": "D",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "100 * (sum by (namespace, container) (rate(container_cpu_usage_seconds_total{container!=\"\", container!=\"POD\", namespace=~\"${namespace:regex}\"}[$__rate_interval]))) / (sum by (namespace, container) (kube_pod_container_resource_requests{resource=\"cpu\", namespace=~\"${namespace:regex}\"} unless on (namespace, pod) (kube_pod_status_phase{phase=~\"Succeeded|Failed\"} == 1)))",
+                        "legendFormat": "__auto",
+                        "range": false,
+                        "instant": true,
+                        "format": "table"
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "E",
                     "hidden": false,
                     "query": {
                       "kind": "DataQuery",
@@ -921,7 +1030,8 @@
                         "Value #A": 2,
                         "Value #B": 3,
                         "Value #C": 4,
-                        "Value #D": 5
+                        "Value #D": 5,
+                        "Value #E": 6
                       },
                       "renameByName": {
                         "namespace": "Namespace",
@@ -929,7 +1039,8 @@
                         "Value #A": "Сейчас",
                         "Value #B": "Requests",
                         "Value #C": "Limits",
-                        "Value #D": "% лимита"
+                        "Value #D": "% request",
+                        "Value #E": "% лимита"
                       }
                     }
                   }
@@ -1012,6 +1123,94 @@
                         }
                       }
                     ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "% request"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "percent"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 0
+                      },
+                      {
+                        "id": "min",
+                        "value": 0
+                      },
+                      {
+                        "id": "max",
+                        "value": 200
+                      },
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "gauge",
+                          "mode": "gradient"
+                        }
+                      },
+                      {
+                        "id": "thresholds",
+                        "value": {
+                          "mode": "absolute",
+                          "steps": [
+                            {
+                              "color": "green",
+                              "value": null
+                            },
+                            {
+                              "color": "orange",
+                              "value": 100
+                            },
+                            {
+                              "color": "red",
+                              "value": 200
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^(Requests|Limits)$"
+                    },
+                    "properties": [
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "0": {
+                                "text": "нет",
+                                "color": "red",
+                                "index": 0
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "transparent"
+                        }
+                      },
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-background",
+                          "mode": "basic"
+                        }
+                      }
+                    ]
                   }
                 ]
               },
@@ -1026,7 +1225,7 @@
       "memNode": {
         "kind": "Panel",
         "spec": {
-          "id": 10,
+          "id": 11,
           "title": "Память ноды",
           "description": "",
           "links": [],
@@ -1110,10 +1309,97 @@
           }
         }
       },
+      "memRequests": {
+        "kind": "Panel",
+        "spec": {
+          "id": 12,
+          "title": "Сумма requests памяти",
+          "description": "Сколько памяти ноды гарантировано подам. До 100% — новые поды перестанут помещаться на ноду (Pending)",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "A",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "100 * sum(kube_pod_container_resource_requests{resource=\"memory\"} unless on (namespace, pod) (kube_pod_status_phase{phase=~\"Succeeded|Failed\"} == 1)) / sum(kube_node_status_allocatable{resource=\"memory\"})",
+                        "legendFormat": "",
+                        "range": false,
+                        "instant": true,
+                        "format": "time_series"
+                      }
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percent",
+                  "decimals": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "orange",
+                        "value": 80
+                      },
+                      {
+                        "color": "red",
+                        "value": 95
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "colorMode": "value",
+                "graphMode": "area",
+                "textMode": "value",
+                "justifyMode": "auto"
+              }
+            }
+          }
+        }
+      },
       "memLimits": {
         "kind": "Panel",
         "spec": {
-          "id": 11,
+          "id": 13,
           "title": "Сумма лимитов памяти",
           "description": "Больше 100% — если все дойдут до лимита, ядро начнёт убивать процессы (OOM)",
           "links": [],
@@ -1200,7 +1486,7 @@
       "memApps": {
         "kind": "Panel",
         "spec": {
-          "id": 12,
+          "id": 14,
           "title": "Память приложений",
           "description": "Сумма working set по контейнерам",
           "links": [],
@@ -1271,7 +1557,7 @@
       "memOom": {
         "kind": "Panel",
         "spec": {
-          "id": 13,
+          "id": 15,
           "title": "OOM-убийств",
           "description": "Контейнеров, у которых последний перезапуск — из-за нехватки памяти (OOMKilled)",
           "links": [],
@@ -1354,7 +1640,7 @@
       "memSeries": {
         "kind": "Panel",
         "spec": {
-          "id": 14,
+          "id": 16,
           "title": "Память по приложениям — накопительно",
           "description": "Working set — память, которую ядро не может отобрать без убийства процесса",
           "links": [],
@@ -1434,7 +1720,7 @@
       "memLines": {
         "kind": "Panel",
         "spec": {
-          "id": 15,
+          "id": 17,
           "title": "Память по приложениям — по отдельности",
           "description": "Без накопления: видно рост и утечки отдельного приложения",
           "links": [],
@@ -1514,7 +1800,7 @@
       "memPct": {
         "kind": "Panel",
         "spec": {
-          "id": 16,
+          "id": 18,
           "title": "Память от лимита",
           "description": "Дойдёт до 100% — контейнер убьют (OOMKilled)",
           "links": [],
@@ -1620,7 +1906,7 @@
       "memRestarts": {
         "kind": "Panel",
         "spec": {
-          "id": 17,
+          "id": 19,
           "title": "Перезапуски за период",
           "description": "Сколько раз контейнер перезапускался за выбранный период: упал, не прошёл liveness или OOM",
           "links": [],
@@ -1715,7 +2001,7 @@
       "memTable": {
         "kind": "Panel",
         "spec": {
-          "id": 18,
+          "id": 20,
           "title": "Контейнеры: память",
           "description": "",
           "links": [],
@@ -1758,7 +2044,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum by (namespace, container) (kube_pod_container_resource_requests{resource=\"memory\", namespace=~\"${namespace:regex}\"} unless on (namespace, pod) (kube_pod_status_phase{phase=~\"Succeeded|Failed\"} == 1))",
+                        "expr": "(sum by (namespace, container) (kube_pod_container_resource_requests{resource=\"memory\", namespace=~\"${namespace:regex}\"} unless on (namespace, pod) (kube_pod_status_phase{phase=~\"Succeeded|Failed\"} == 1))) or (0 * sum by (namespace, container) (container_memory_working_set_bytes{container!=\"\", container!=\"POD\", namespace=~\"${namespace:regex}\"}))",
                         "legendFormat": "__auto",
                         "range": false,
                         "instant": true,
@@ -1780,7 +2066,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum by (namespace, container) (kube_pod_container_resource_limits{resource=\"memory\", namespace=~\"${namespace:regex}\"} unless on (namespace, pod) (kube_pod_status_phase{phase=~\"Succeeded|Failed\"} == 1))",
+                        "expr": "(sum by (namespace, container) (kube_pod_container_resource_limits{resource=\"memory\", namespace=~\"${namespace:regex}\"} unless on (namespace, pod) (kube_pod_status_phase{phase=~\"Succeeded|Failed\"} == 1))) or (0 * sum by (namespace, container) (container_memory_working_set_bytes{container!=\"\", container!=\"POD\", namespace=~\"${namespace:regex}\"}))",
                         "legendFormat": "__auto",
                         "range": false,
                         "instant": true,
@@ -1793,6 +2079,28 @@
                   "kind": "PanelQuery",
                   "spec": {
                     "refId": "D",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "100 * (sum by (namespace, container) (container_memory_working_set_bytes{container!=\"\", container!=\"POD\", namespace=~\"${namespace:regex}\"})) / (sum by (namespace, container) (kube_pod_container_resource_requests{resource=\"memory\", namespace=~\"${namespace:regex}\"} unless on (namespace, pod) (kube_pod_status_phase{phase=~\"Succeeded|Failed\"} == 1)))",
+                        "legendFormat": "__auto",
+                        "range": false,
+                        "instant": true,
+                        "format": "table"
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "E",
                     "hidden": false,
                     "query": {
                       "kind": "DataQuery",
@@ -1835,7 +2143,8 @@
                         "Value #A": 2,
                         "Value #B": 3,
                         "Value #C": 4,
-                        "Value #D": 5
+                        "Value #D": 5,
+                        "Value #E": 6
                       },
                       "renameByName": {
                         "namespace": "Namespace",
@@ -1843,7 +2152,8 @@
                         "Value #A": "Сейчас",
                         "Value #B": "Requests",
                         "Value #C": "Limits",
-                        "Value #D": "% лимита"
+                        "Value #D": "% request",
+                        "Value #E": "% лимита"
                       }
                     }
                   }
@@ -1926,6 +2236,94 @@
                         }
                       }
                     ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "% request"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "percent"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 0
+                      },
+                      {
+                        "id": "min",
+                        "value": 0
+                      },
+                      {
+                        "id": "max",
+                        "value": 200
+                      },
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "gauge",
+                          "mode": "gradient"
+                        }
+                      },
+                      {
+                        "id": "thresholds",
+                        "value": {
+                          "mode": "absolute",
+                          "steps": [
+                            {
+                              "color": "green",
+                              "value": null
+                            },
+                            {
+                              "color": "orange",
+                              "value": 100
+                            },
+                            {
+                              "color": "red",
+                              "value": 200
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^(Requests|Limits)$"
+                    },
+                    "properties": [
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "0": {
+                                "text": "нет",
+                                "color": "red",
+                                "index": 0
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "transparent"
+                        }
+                      },
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-background",
+                          "mode": "basic"
+                        }
+                      }
+                    ]
                   }
                 ]
               },
@@ -1940,7 +2338,7 @@
       "diskFree": {
         "kind": "Panel",
         "spec": {
-          "id": 19,
+          "id": 21,
           "title": "Свободно на диске",
           "description": "Реальный предел для всех томов local-path: они делят один диск",
           "links": [],
@@ -2027,7 +2425,7 @@
       "diskPct": {
         "kind": "Panel",
         "spec": {
-          "id": 20,
+          "id": 22,
           "title": "Заполнение диска",
           "description": "",
           "links": [],
@@ -2114,7 +2512,7 @@
       "volTotal": {
         "kind": "Panel",
         "spec": {
-          "id": 21,
+          "id": 23,
           "title": "Занято томами",
           "description": "Сумма du по папкам томов, включая брошенные",
           "links": [],
@@ -2185,7 +2583,7 @@
       "volAge": {
         "kind": "Panel",
         "spec": {
-          "id": 22,
+          "id": 24,
           "title": "Последний подсчёт",
           "description": "du запускается раз в 5 минут; больше 15 минут — сборщик volume-usage не работает",
           "links": [],
@@ -2268,7 +2666,7 @@
       "volPct": {
         "kind": "Panel",
         "spec": {
-          "id": 23,
+          "id": 25,
           "title": "Заполнение томов (% от размера PVC)",
           "description": "Размер PVC для local-path не ограничивает запись — это ориентир. Больше 100% — том вылез за заявленный размер",
           "links": [],
@@ -2374,7 +2772,7 @@
       "volTable": {
         "kind": "Panel",
         "spec": {
-          "id": 24,
+          "id": 26,
           "title": "Тома",
           "description": "",
           "links": [],
@@ -2575,7 +2973,7 @@
       "volOrphans": {
         "kind": "Panel",
         "spec": {
-          "id": 25,
+          "id": 27,
           "title": "Брошенные папки",
           "description": "Папки local-path без живого PV: остались после удаления PVC. Занимают место; если данные не нужны — удалить папку на ноде",
           "links": [],
@@ -2672,7 +3070,7 @@
       "volStack": {
         "kind": "Panel",
         "spec": {
-          "id": 26,
+          "id": 28,
           "title": "Тома — накопительно",
           "description": "Сколько диска занимают тома вместе и кто основной вклад",
           "links": [],
@@ -2752,7 +3150,7 @@
       "volSeries": {
         "kind": "Panel",
         "spec": {
-          "id": 27,
+          "id": 29,
           "title": "Тома — по отдельности",
           "description": "",
           "links": [],
@@ -2851,7 +3249,7 @@
                         },
                         "x": 0,
                         "y": 0,
-                        "width": 6,
+                        "width": 5,
                         "height": 5
                       }
                     },
@@ -2862,9 +3260,22 @@
                           "kind": "ElementReference",
                           "name": "cpuLoad"
                         },
-                        "x": 6,
+                        "x": 5,
                         "y": 0,
-                        "width": 6,
+                        "width": 4,
+                        "height": 5
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cpuRequests"
+                        },
+                        "x": 9,
+                        "y": 0,
+                        "width": 5,
                         "height": 5
                       }
                     },
@@ -2875,9 +3286,9 @@
                           "kind": "ElementReference",
                           "name": "cpuLimits"
                         },
-                        "x": 12,
+                        "x": 14,
                         "y": 0,
-                        "width": 6,
+                        "width": 5,
                         "height": 5
                       }
                     },
@@ -2888,9 +3299,9 @@
                           "kind": "ElementReference",
                           "name": "cpuApps"
                         },
-                        "x": 18,
+                        "x": 19,
                         "y": 0,
-                        "width": 6,
+                        "width": 5,
                         "height": 5
                       }
                     },
@@ -2981,7 +3392,20 @@
                         },
                         "x": 0,
                         "y": 0,
-                        "width": 6,
+                        "width": 5,
+                        "height": 5
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "memRequests"
+                        },
+                        "x": 5,
+                        "y": 0,
+                        "width": 5,
                         "height": 5
                       }
                     },
@@ -2992,9 +3416,9 @@
                           "kind": "ElementReference",
                           "name": "memLimits"
                         },
-                        "x": 6,
+                        "x": 10,
                         "y": 0,
-                        "width": 6,
+                        "width": 5,
                         "height": 5
                       }
                     },
@@ -3005,9 +3429,9 @@
                           "kind": "ElementReference",
                           "name": "memApps"
                         },
-                        "x": 12,
+                        "x": 15,
                         "y": 0,
-                        "width": 6,
+                        "width": 5,
                         "height": 5
                       }
                     },
@@ -3018,9 +3442,9 @@
                           "kind": "ElementReference",
                           "name": "memOom"
                         },
-                        "x": 18,
+                        "x": 20,
                         "y": 0,
-                        "width": 6,
+                        "width": 4,
                         "height": 5
                       }
                     },
