@@ -2,7 +2,9 @@
 # для local-path бесполезны: тома — папки на общем диске, kubelet либо молчит,
 # либо отдаёт заполненность всего диска. Поэтому DaemonSet раз в 5 минут считает
 # du по папкам томов на ноде и отдаёт:
-#   local_path_volume_used_bytes{node, pvc_namespace, persistentvolumeclaim}
+#   local_path_volume_used_bytes{node, volume, pvc_namespace, persistentvolumeclaim}
+# volume — имя PV. Папки без живого PV (остались после удаления PVC) дашборд
+# показывает отдельно: kube_persistentvolumeclaim_info{volumename} их не знает.
 # Namespace тома — в pvc_namespace: метку namespace Prometheus перезапишет
 # namespace'ом самого пода (скрейп по аннотации prometheus.io/scrape).
 # Папка томов на ноде — .Values.cluster.localPathStorageDir (cluster.yaml проекта).

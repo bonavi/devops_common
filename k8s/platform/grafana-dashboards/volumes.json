@@ -150,7 +150,7 @@
     {
       "type": "stat",
       "title": "Занято томами",
-      "description": "Сумма du по всем томам local-path",
+      "description": "Сумма du по папкам томов, включая брошенные",
       "gridPos": {
         "x": 12,
         "y": 0,
@@ -279,7 +279,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "100 * (sum by (namespace, persistentvolumeclaim) (label_replace(local_path_volume_used_bytes, \"namespace\", \"$1\", \"pvc_namespace\", \"(.+)\"))) / (sum by (namespace, persistentvolumeclaim) (kube_persistentvolumeclaim_resource_requests_storage_bytes))",
+          "expr": "100 * (sum by (namespace, persistentvolumeclaim) (label_replace(label_replace(local_path_volume_used_bytes, \"namespace\", \"$1\", \"pvc_namespace\", \"(.+)\"), \"volumename\", \"$1\", \"volume\", \"(.+)\") and on (volumename) kube_persistentvolumeclaim_info)) / (sum by (namespace, persistentvolumeclaim) (kube_persistentvolumeclaim_resource_requests_storage_bytes))",
           "refId": "A",
           "legendFormat": "{{namespace}} / {{persistentvolumeclaim}}",
           "format": "time_series",
@@ -359,7 +359,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (namespace, persistentvolumeclaim) (label_replace(local_path_volume_used_bytes, \"namespace\", \"$1\", \"pvc_namespace\", \"(.+)\"))",
+          "expr": "sum by (namespace, persistentvolumeclaim) (label_replace(label_replace(local_path_volume_used_bytes, \"namespace\", \"$1\", \"pvc_namespace\", \"(.+)\"), \"volumename\", \"$1\", \"volume\", \"(.+)\") and on (volumename) kube_persistentvolumeclaim_info)",
           "refId": "A",
           "legendFormat": "__auto",
           "format": "table",
@@ -385,7 +385,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "100 * (sum by (namespace, persistentvolumeclaim) (label_replace(local_path_volume_used_bytes, \"namespace\", \"$1\", \"pvc_namespace\", \"(.+)\"))) / (sum by (namespace, persistentvolumeclaim) (kube_persistentvolumeclaim_resource_requests_storage_bytes))",
+          "expr": "100 * (sum by (namespace, persistentvolumeclaim) (label_replace(label_replace(local_path_volume_used_bytes, \"namespace\", \"$1\", \"pvc_namespace\", \"(.+)\"), \"volumename\", \"$1\", \"volume\", \"(.+)\") and on (volumename) kube_persistentvolumeclaim_info)) / (sum by (namespace, persistentvolumeclaim) (kube_persistentvolumeclaim_resource_requests_storage_bytes))",
           "refId": "C",
           "legendFormat": "__auto",
           "format": "table",
@@ -502,7 +502,7 @@
       "title": "Рост томов",
       "gridPos": {
         "x": 0,
-        "y": 17,
+        "y": 26,
         "w": 24,
         "h": 10
       },
@@ -517,7 +517,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (namespace, persistentvolumeclaim) (label_replace(local_path_volume_used_bytes, \"namespace\", \"$1\", \"pvc_namespace\", \"(.+)\"))",
+          "expr": "sum by (namespace, persistentvolumeclaim) (label_replace(label_replace(local_path_volume_used_bytes, \"namespace\", \"$1\", \"pvc_namespace\", \"(.+)\"), \"volumename\", \"$1\", \"volume\", \"(.+)\") and on (volumename) kube_persistentvolumeclaim_info)",
           "refId": "A",
           "legendFormat": "{{namespace}} / {{persistentvolumeclaim}}",
           "format": "time_series",
@@ -553,6 +553,82 @@
         }
       },
       "id": 7
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Брошенные папки",
+      "description": "Папки local-path без живого PV: остались после удаления PVC (reclaimPolicy Retain или ручное удаление). Занимают место на диске; если данные не нужны — удалить папку на ноде",
+      "gridPos": {
+        "x": 0,
+        "y": 17,
+        "w": 24,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (namespace, persistentvolumeclaim, volumename) (label_replace(label_replace(local_path_volume_used_bytes, \"namespace\", \"$1\", \"pvc_namespace\", \"(.+)\"), \"volumename\", \"$1\", \"volume\", \"(.+)\") unless on (volumename) kube_persistentvolumeclaim_info)",
+          "refId": "A",
+          "legendFormat": "__auto",
+          "format": "table",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "namespace": 0,
+              "persistentvolumeclaim": 1,
+              "volumename": 2,
+              "Value": 3
+            },
+            "renameByName": {
+              "namespace": "Namespace",
+              "persistentvolumeclaim": "Был PVC",
+              "volumename": "Папка",
+              "Value": "Занято"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Занято",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 1,
+          "noValue": "Брошенных папок нет"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      }
     }
   ],
   "templating": {
