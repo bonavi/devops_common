@@ -1,0 +1,87 @@
+# Сколько занимает каждый том local-path. Метрики kubelet (kubelet_volume_stats_*)
+# для local-path бесполезны: тома — папки на общем диске, kubelet либо молчит,
+# либо отдаёт заполненность всего диска. Поэтому DaemonSet раз в 5 минут считает
+# du по папкам томов на ноде и отдаёт:
+#   local_path_volume_used_bytes{node, pvc_namespace, persistentvolumeclaim}
+# Namespace тома — в pvc_namespace: метку namespace Prometheus перезапишет
+# namespace'ом самого пода (скрейп по аннотации prometheus.io/scrape).
+# Папка томов на ноде — .Values.cluster.localPathStorageDir (cluster.yaml проекта).
+# Дашборд — grafana-dashboards/volumes.json.
+resources:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: volume-usage-script
+    data:
+      collect.sh: |
+{{ readFile "collect.sh" | indent 8 }}
+
+  - apiVersion: apps/v1
+    kind: DaemonSet
+    metadata:
+      name: volume-usage
+      labels:
+        app: volume-usage
+    spec:
+      selector:
+        matchLabels:
+          app: volume-usage
+      template:
+        metadata:
+          labels:
+            app: volume-usage
+          annotations:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "9101"
+            prometheus.io/path: /metrics
+            # Перезапуск при изменении скрипта
+            checksum/script: {{ readFile "collect.sh" | sha256sum | trunc 8 | quote }}
+        spec:
+          automountServiceAccountToken: false
+          containers:
+            - name: collector
+              image: busybox:1.37.0
+              command: ["sh", "/scripts/collect.sh"]
+              env:
+                - name: NODE_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: spec.nodeName
+              ports:
+                - name: metrics
+                  containerPort: 9101
+              # root нужен, чтобы du прочитал папки томов с чужими владельцами (Postgres — 700).
+              # Из прав root оставлено только чтение каталогов в обход прав доступа.
+              securityContext:
+                runAsUser: 0
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+                  add: [DAC_READ_SEARCH]
+              resources:
+                requests:
+                  cpu: 5m
+                  memory: 16Mi
+                limits:
+                  cpu: 200m
+                  memory: 64Mi
+              volumeMounts:
+                - name: storage
+                  mountPath: /storage
+                  readOnly: true
+                - name: scripts
+                  mountPath: /scripts
+                - name: www
+                  mountPath: /www
+          volumes:
+            - name: storage
+              hostPath:
+                path: {{ .Values.cluster.localPathStorageDir }}
+                type: Directory
+            - name: scripts
+              configMap:
+                name: volume-usage-script
+            - name: www
+              emptyDir:
+                sizeLimit: 1Mi
