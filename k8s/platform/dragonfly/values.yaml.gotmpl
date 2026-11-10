@@ -1,0 +1,54 @@
+# Dragonfly — Redis-совместимое хранилище, одно на окружение, без оператора:
+# обычный Deployment на чарте app. Адрес: dragonfly.dragonfly-<env>.svc.cluster.local:6379,
+# пароль — .Values.dragonfly.password (SOPS). Данные не сохраняются между рестартами:
+# подходит для кэша и очередей, не для хранения.
+# Проект задаёт ресурсы, число потоков и флаги клиентов в config/dragonfly/values.yaml.gotmpl.
+image:
+  repository: docker.dragonflydb.io/dragonflydb/dragonfly
+  tag: v2.0.2
+
+replicaCount: 1
+
+# Флаги под конкретных клиентов (Lua, кластерный режим) задаёт проект
+# переменными DFLY_<флаг> в config/dragonfly/values.yaml.gotmpl
+args:
+  - --logtostderr
+
+service:
+  enabled: true
+  type: ClusterIP
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+
+startupProbe:
+  enabled: true
+  # httpGet из дефолтов чарта перекрыл бы tcpSocket
+  httpGet: null
+  tcpSocket:
+    port: redis
+  failureThreshold: 30
+  periodSeconds: 2
+
+livenessProbe:
+  enabled: true
+  # httpGet из дефолтов чарта перекрыл бы tcpSocket
+  httpGet: null
+  tcpSocket:
+    port: redis
+  periodSeconds: 10
+  timeoutSeconds: 3
+
+readinessProbe:
+  enabled: true
+  # httpGet из дефолтов чарта перекрыл бы tcpSocket
+  httpGet: null
+  tcpSocket:
+    port: redis
+  periodSeconds: 5
+  timeoutSeconds: 3
+
+# Dragonfly читает флаги из переменных DFLY_<флаг>
+secretEnv:
+  DFLY_requirepass: {{ .Values.dragonfly.password | quote }}
