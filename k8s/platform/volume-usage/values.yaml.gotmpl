@@ -35,7 +35,9 @@ resources:
           annotations:
             prometheus.io/scrape: "true"
             prometheus.io/port: "9101"
-            prometheus.io/path: /metrics
+            # .txt — чтобы busybox httpd отдал Content-Type text/plain: Prometheus 3
+            # отклоняет ответ с пустым Content-Type
+            prometheus.io/path: /metrics.txt
             # Перезапуск при изменении скрипта
             checksum/script: {{ readFile "collect.sh" | sha256sum | trunc 8 | quote }}
         spec:

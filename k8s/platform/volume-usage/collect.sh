@@ -20,7 +20,7 @@ collect() {
     echo '# TYPE local_path_volume_last_collect_seconds gauge'
     echo "local_path_volume_last_collect_seconds{node=\"$NODE_NAME\"} $(date +%s)"
   } > "$tmp"
-  mv "$tmp" /www/metrics
+  mv "$tmp" /www/metrics.txt
 }
 collect
 ( while sleep 300; do collect || true; done ) &
