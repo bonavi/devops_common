@@ -518,7 +518,7 @@
         "spec": {
           "id": 6,
           "title": "CPU по приложениям — накопительно",
-          "description": "",
+          "description": "Серая серия — k3s, containerd, ядро и процессы хоста: верх графика = загрузка ноды",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -539,6 +539,28 @@
                       "spec": {
                         "expr": "sum by (namespace, container) (rate(container_cpu_usage_seconds_total{container!=\"\", container!=\"POD\", namespace=~\"${namespace:regex}\"}[$__rate_interval]))",
                         "legendFormat": "{{namespace}} / {{container}}",
+                        "range": true,
+                        "instant": false,
+                        "format": "time_series"
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "B",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(rate(node_cpu_seconds_total{mode!~\"idle|iowait|steal\", job=\"node-exporter\"}[$__rate_interval])) - sum(rate(container_cpu_usage_seconds_total{container!=\"\", container!=\"POD\"}[$__rate_interval]))",
+                        "legendFormat": "Система (вне контейнеров)",
                         "range": true,
                         "instant": false,
                         "format": "time_series"
@@ -570,7 +592,23 @@
                     }
                   }
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Система (вне контейнеров)"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#808080"
+                        }
+                      }
+                    ]
+                  }
+                ]
               },
               "options": {
                 "legend": {
@@ -1642,7 +1680,7 @@
         "spec": {
           "id": 16,
           "title": "Память по приложениям — накопительно",
-          "description": "Working set — память, которую ядро не может отобрать без убийства процесса",
+          "description": "Working set — память, которую ядро не может отобрать без убийства процесса. Серая серия — k3s, containerd, ядро и процессы хоста: верх графика = память ноды",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1663,6 +1701,28 @@
                       "spec": {
                         "expr": "sum by (namespace, container) (container_memory_working_set_bytes{container!=\"\", container!=\"POD\", namespace=~\"${namespace:regex}\"})",
                         "legendFormat": "{{namespace}} / {{container}}",
+                        "range": true,
+                        "instant": false,
+                        "format": "time_series"
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "B",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(node_memory_MemTotal_bytes{job=\"node-exporter\"} - node_memory_MemAvailable_bytes{job=\"node-exporter\"}) - sum(container_memory_working_set_bytes{container!=\"\", container!=\"POD\"})",
+                        "legendFormat": "Система (вне контейнеров)",
                         "range": true,
                         "instant": false,
                         "format": "time_series"
@@ -1694,7 +1754,23 @@
                     }
                   }
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Система (вне контейнеров)"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#808080"
+                        }
+                      }
+                    ]
+                  }
+                ]
               },
               "options": {
                 "legend": {
