@@ -45,6 +45,12 @@
     jump: ACCEPT
   when: firewall_allow_ping
 
+- name: Fail fast if a rule sets both interface and interfaces
+  ansible.builtin.assert:
+    that:
+      - firewall_allowed_ports | selectattr('interface', 'defined') | selectattr('interfaces', 'defined') | list | length == 0
+    fail_msg: "В правиле firewall_allowed_ports заданы и interface, и interfaces — оставь одно"
+
 - name: Allow configured ports in {{ firewall_chain }}
   ansible.builtin.iptables:
     chain: "{{ firewall_chain }}"
@@ -59,10 +65,24 @@
     # WG-интерфейса под конкретное устройство нет.
     source: "{{ item.source | default(omit) }}"
     jump: ACCEPT
-  loop: "{{ firewall_allowed_ports }}"
+  loop: "{{ firewall_allowed_ports | rejectattr('interfaces', 'defined') }}"
   loop_control:
     label: >-
       {{ item.protocol }}/{{ item.port }}{{ (' via ' + item.interface) if item.interface is defined else '' }}{{ (' from ' + item.source) if item.source is defined else '' }}
+
+# То же для правил со списком interfaces: одно правило iptables на каждый интерфейс
+- name: Allow configured ports on several interfaces in {{ firewall_chain }}
+  ansible.builtin.iptables:
+    chain: "{{ firewall_chain }}"
+    protocol: "{{ item.0.protocol }}"
+    destination_port: "{{ item.0.port }}"
+    in_interface: "{{ item.1 }}"
+    source: "{{ item.0.source | default(omit) }}"
+    jump: ACCEPT
+  loop: "{{ firewall_allowed_ports | selectattr('interfaces', 'defined') | subelements('interfaces') }}"
+  loop_control:
+    label: >-
+      {{ item.0.protocol }}/{{ item.0.port }} via {{ item.1 }}{{ (' from ' + item.0.source) if item.0.source is defined else '' }}
 
 # Вставляется первым (-I INPUT 1), но это не гарантирует, что она навсегда
 # останется первой строкой: например kube-router на k3s-нодах периодически
