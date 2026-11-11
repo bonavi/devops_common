@@ -1,0 +1,23 @@
+# {{ ansible_managed }} — роль firewall. Применяется: iptables-restore --noflush
+# Каждая таблица — одна транзакция: цепочка очищается и заполняется заново атомарно.
+*filter
+:{{ firewall_chain }} - [0:0]
+-F {{ firewall_chain }}
+-A {{ firewall_chain }} -i lo -j ACCEPT
+-A {{ firewall_chain }} -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+{% if firewall_allow_ping %}
+-A {{ firewall_chain }} -p icmp -m icmp --icmp-type 8 -j ACCEPT
+{% endif %}
+{% for rule in firewall_allowed_ports %}
+{%   for iface in (rule.interfaces if rule.interfaces is defined else [rule.interface | default('')]) %}
+-A {{ firewall_chain }}{{ (' -i ' + iface) if iface else '' }}{{ (' -s ' + rule.source) if rule.source is defined else '' }} -p {{ rule.protocol }} -m {{ rule.protocol }} --dport {{ rule.port }} -j ACCEPT
+{%   endfor %}
+{% endfor %}
+COMMIT
+*mangle
+:{{ firewall_tunnel_chain }} - [0:0]
+-F {{ firewall_tunnel_chain }}
+{% for t in firewall_tunnels_to_self_only %}
+-A {{ firewall_tunnel_chain }} -i {{ t.interface }} ! -d {{ t.address }} -j DROP
+{% endfor %}
+COMMIT
