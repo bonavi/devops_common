@@ -10,4 +10,5 @@ cat <<'HELP'
   make do-k3s                 действие с кластером           ACTION=apply|sync|diff|template|destroy|restore-db|kubeconfig
                                                              ENV=prod|dev RELEASE=all|<релиз>
                                                              RELEASE_TIMEOUT=180 APP_VERSION=latest KUBE_USER=devops
+  make do-terraform           terraform-модуль проекта       MODULE=<папка в terraform/> ACTION=plan|apply|import
 HELP
