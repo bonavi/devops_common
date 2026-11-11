@@ -17,72 +17,64 @@
         state: present
         update_cache: yes
 
-- name: Ensure {{ firewall_chain }} chain exists
-  ansible.builtin.iptables:
-    chain: "{{ firewall_chain }}"
-    chain_management: true
-    state: present
-
-- name: Allow loopback traffic in {{ firewall_chain }}
-  ansible.builtin.iptables:
-    chain: "{{ firewall_chain }}"
-    in_interface: lo
-    jump: ACCEPT
-
-- name: Allow established/related traffic in {{ firewall_chain }}
-  ansible.builtin.iptables:
-    chain: "{{ firewall_chain }}"
-    ctstate:
-      - ESTABLISHED
-      - RELATED
-    jump: ACCEPT
-
-- name: Allow inbound ping (ICMP echo-request) in {{ firewall_chain }}
-  ansible.builtin.iptables:
-    chain: "{{ firewall_chain }}"
-    protocol: icmp
-    icmp_type: echo-request
-    jump: ACCEPT
-  when: firewall_allow_ping
-
 - name: Fail fast if a rule sets both interface and interfaces
   ansible.builtin.assert:
     that:
       - firewall_allowed_ports | selectattr('interface', 'defined') | selectattr('interfaces', 'defined') | list | length == 0
     fail_msg: "В правиле firewall_allowed_ports заданы и interface, и interfaces — оставь одно"
 
-- name: Allow configured ports in {{ firewall_chain }}
-  ansible.builtin.iptables:
-    chain: "{{ firewall_chain }}"
-    protocol: "{{ item.protocol }}"
-    destination_port: "{{ item.port }}"
-    in_interface: "{{ item.interface | default(omit) }}"
-    # Опционально — сузить и по source IP/CIDR (например конкретное
-    # LAN-устройство). Слабее, чем interface (глава 5.3 iptables.md —
-    # IP можно подделать теоретически, динамический IP ломает правило
-    # молча), но иногда единственный доступный рычаг: если весь LAN
-    # приходит на один физический интерфейс, а выделенного
-    # WG-интерфейса под конкретное устройство нет.
-    source: "{{ item.source | default(omit) }}"
-    jump: ACCEPT
-  loop: "{{ firewall_allowed_ports | rejectattr('interfaces', 'defined') }}"
-  loop_control:
-    label: >-
-      {{ item.protocol }}/{{ item.port }}{{ (' via ' + item.interface) if item.interface is defined else '' }}{{ (' from ' + item.source) if item.source is defined else '' }}
+# Цепочки роли пересобираются целиком из конфига при каждом прогоне: убранное из
+# host_vars исчезает и с хоста. Подмена атомарная — iptables-restore применяет
+# таблицу одной транзакцией, промежутка без правил нет (иначе при INPUT DROP
+# оборвался бы SSH, через который идёт прогон). --noflush: остальные цепочки
+# таблиц (k3s, kube-router, docker) не трогаются.
+- name: Ensure rules directory exists
+  ansible.builtin.file:
+    path: "{{ firewall_rules_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
 
-# То же для правил со списком interfaces: одно правило iptables на каждый интерфейс
-- name: Allow configured ports on several interfaces in {{ firewall_chain }}
+- name: Render {{ firewall_chain }} rules
+  ansible.builtin.template:
+    src: rules.v4.j2
+    dest: "{{ firewall_rules_dir }}/{{ firewall_chain | lower }}.rules"
+    owner: root
+    group: root
+    mode: "0600"
+    # Синтаксис проверяется до записи: сломанный шаблон не дойдёт до применения
+    validate: iptables-restore --test --noflush %s
+
+- name: Read current rules of the role chains
+  ansible.builtin.shell: >-
+    iptables -S {{ firewall_chain }} 2>/dev/null;
+    iptables -t mangle -S {{ firewall_tunnel_chain }} 2>/dev/null
+  register: firewall_before
+  changed_when: false
+
+- name: Apply {{ firewall_chain }} rules atomically
+  ansible.builtin.command: iptables-restore --noflush {{ firewall_rules_dir }}/{{ firewall_chain | lower }}.rules
+  changed_when: false
+
+- name: Read applied rules of the role chains
+  ansible.builtin.shell: >-
+    iptables -S {{ firewall_chain }} 2>/dev/null;
+    iptables -t mangle -S {{ firewall_tunnel_chain }} 2>/dev/null
+  register: firewall_after
+  changed_when: firewall_after.stdout != firewall_before.stdout
+
+# Из туннеля — только к самому хосту: mangle PREROUTING срабатывает раньше DNAT
+# k3s (ClusterIP → под), после которого правила k3s в FORWARD пропускают пакет
+# мимо политики DROP
+- name: Call {{ firewall_tunnel_chain }} from the top of mangle PREROUTING
   ansible.builtin.iptables:
-    chain: "{{ firewall_chain }}"
-    protocol: "{{ item.0.protocol }}"
-    destination_port: "{{ item.0.port }}"
-    in_interface: "{{ item.1 }}"
-    source: "{{ item.0.source | default(omit) }}"
-    jump: ACCEPT
-  loop: "{{ firewall_allowed_ports | selectattr('interfaces', 'defined') | subelements('interfaces') }}"
-  loop_control:
-    label: >-
-      {{ item.0.protocol }}/{{ item.0.port }} via {{ item.1 }}{{ (' from ' + item.0.source) if item.0.source is defined else '' }}
+    table: mangle
+    chain: PREROUTING
+    jump: "{{ firewall_tunnel_chain }}"
+    action: insert
+    rule_num: 1
+  when: firewall_tunnels_to_self_only | length > 0
 
 # Вставляется первым (-I INPUT 1), но это не гарантирует, что она навсегда
 # останется первой строкой: например kube-router на k3s-нодах периодически

@@ -3,6 +3,18 @@
 # сама фильтрация происходит внутри цепочки.
 firewall_chain: FRONTDOOR
 
+# Цепочка в mangle для firewall_tunnels_to_self_only и папка с собранными правилами
+firewall_tunnel_chain: TUNNEL_TO_SELF
+firewall_rules_dir: /etc/iptables/role-firewall
+
+# Туннели, из которых можно только к самому хосту: пакет с интерфейса с чужим
+# адресом назначения отбрасывается до любой маршрутизации и DNAT. Закрывает
+# пересылку из туннеля в сеть подов, на ClusterIP и в LAN при ip_forward=1.
+#
+# firewall_tunnels_to_self_only:
+#   - { interface: wg-client-pi, address: 10.20.20.1 }
+firewall_tunnels_to_self_only: []
+
 # Список разрешённых входящих портов.
 # interface — опционально: ограничивает правило конкретным интерфейсом
 # (например wg0), иначе порт открыт с любого интерфейса.
