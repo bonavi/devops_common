@@ -4,6 +4,15 @@ Address = {{ wg.address | join(', ') }}
 ListenPort = {{ wg.listen_port }}
 {% endif %}
 PrivateKey = {{ wireguard_private_keys[wg.interface] }}
+{% if wg.mtu is defined %}
+MTU = {{ wg.mtu }}
+{% endif %}
+{% for cmd in wg.post_up | default([]) %}
+PostUp = {{ cmd }}
+{% endfor %}
+{% for cmd in wg.post_down | default([]) %}
+PostDown = {{ cmd }}
+{% endfor %}
 {% for peer in wg.peers | default([]) if (peer.public_key | default('')) | length == 44 %}
 
 # {{ peer.name | default('peer') }}
