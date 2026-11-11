@@ -11,8 +11,12 @@ firewall_chain: FRONTDOOR
 # динамический IP ломает правило молча) — использовать, когда нет отдельного
 # интерфейса под нужный источник (весь LAN на одном eth0).
 #
+# interfaces — то же, но списком: правило на каждый интерфейс (LAN по Wi-Fi и кабелю,
+# несколько WG-сетей). interface и interfaces в одном правиле не сочетаются.
+#
 # firewall_allowed_ports:
 #   - { port: 80, protocol: tcp }
+#   - { port: 8095, protocol: tcp, interfaces: [wlan0, eth0] }
 #   - { port: 443, protocol: tcp }
 #   - { port: 6443, protocol: tcp, interface: wg0 }
 #   - { port: 1883, protocol: tcp, source: "192.168.1.50/32" }
