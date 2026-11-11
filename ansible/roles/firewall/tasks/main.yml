@@ -49,7 +49,7 @@
 - name: Read current rules of the role chains
   ansible.builtin.shell: >-
     iptables -S {{ firewall_chain }} 2>/dev/null;
-    iptables -t mangle -S {{ firewall_tunnel_chain }} 2>/dev/null
+    iptables -t mangle -S {{ firewall_tunnel_chain }} 2>/dev/null; true
   register: firewall_before
   changed_when: false
 
@@ -60,7 +60,7 @@
 - name: Read applied rules of the role chains
   ansible.builtin.shell: >-
     iptables -S {{ firewall_chain }} 2>/dev/null;
-    iptables -t mangle -S {{ firewall_tunnel_chain }} 2>/dev/null
+    iptables -t mangle -S {{ firewall_tunnel_chain }} 2>/dev/null; true
   register: firewall_after
   changed_when: firewall_after.stdout != firewall_before.stdout
 
