@@ -1,5 +1,5 @@
 export ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
-export HOST GROUP PLAYBOOK ANSIBLE_ARGS ACTION ENV RELEASE APP_VERSION RELEASE_TIMEOUT KUBE_USER
+export HOST GROUP PLAYBOOK ANSIBLE_ARGS ACTION ENV RELEASE APP_VERSION RELEASE_TIMEOUT KUBE_USER MODULE
 SCRIPTS := $(ROOT)/common/scripts/make
 
 # Список задач и параметров (задача по умолчанию)
@@ -23,4 +23,9 @@ run-ansible-playbook:
 do-k3s:
 	@$(SCRIPTS)/do-k3s.sh
 
-.PHONY: help edit-ansible-secrets edit-k3s-secrets run-ansible-playbook do-k3s
+# Terraform-модуль проекта (terraform/<модуль>): plan|apply|import.
+#                                          MODULE=dns ACTION=plan
+do-terraform:
+	@$(SCRIPTS)/do-terraform.sh
+
+.PHONY: help edit-ansible-secrets edit-k3s-secrets run-ansible-playbook do-k3s do-terraform
