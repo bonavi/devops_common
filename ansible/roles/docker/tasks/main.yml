@@ -13,14 +13,28 @@
       - software-properties-common
     state: present
 
+# apt-key убран из Ubuntu 26.04: ключ репозитория кладём в /etc/apt/keyrings и подключаем через signed-by
+- name: Create apt keyrings directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
 - name: Add Docker's GPG key
-  apt_key:
+  ansible.builtin.get_url:
     url: https://download.docker.com/linux/ubuntu/gpg
-    state: present
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644'
+
+# Серверы, настроенные старой версией роли: строка репозитория без signed-by конфликтует с новой
+- name: Remove legacy Docker repository entry (without signed-by)
+  apt_repository:
+    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+    state: absent
 
 - name: Add Docker repository
   apt_repository:
-    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+    repo: deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
     state: present
 
 - name: Install Docker
@@ -46,3 +60,6 @@
     groups: docker
     append: yes
   loop: "{{ users }}"
+  # В выводе только имя пользователя: item содержит пароль
+  loop_control:
+    label: "{{ item.name }}"
